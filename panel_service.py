@@ -1,11 +1,15 @@
 #!/usr/bin/python
 import sys
+import platform
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QGraphicsOpacityEffect
 from PyQt5 import QtCore, QtGui
 from PyQt5.QtGui import QPixmap, QFont, QMovie
 from PyQt5.QtCore import QTimer, QTime, Qt, QUrl, QDateTime
 #from PyQt5.QtMultimedia import QMediaContent, QMediaPlayer
 #from PyQt5.QtMultimediaWidgets import QVideoWidget
+
+
+RELEASE_PROD='5.10.17-v7l+'
 
 
 class MainWindow(QWidget):
@@ -15,13 +19,14 @@ class MainWindow(QWidget):
 
 	def __init__(self, screen):
 		super().__init__()
+		self.setWindowIcon(QtGui.QIcon('icon.ico'))
 		size = screen.size()
-		# Unlock to prod
-		screen_width = size.width()
-		screen_height = size.height()
-		# Lock to prod
-		#screen_width = 388
-		#screen_height = 690
+		if platform.release() == RELEASE_PROD:
+			screen_width = size.width()
+			screen_height = size.height()
+		else:
+			screen_width = 388
+			screen_height = 690
 		self.coef_width = screen_width / self.dev_screen_width
 		self.coef_height = screen_height / self.dev_screen_height
 		print(self.coef_width, self.coef_height)
@@ -34,7 +39,7 @@ class MainWindow(QWidget):
 
 		# -- Back
 		label = QLabel(self)
-		pixmap = QPixmap('back_v3.png')
+		pixmap = QPixmap('res/img/back_v3.png')
 		pixmap = pixmap.scaled(screen_width, screen_height, QtCore.Qt.KeepAspectRatio)
 		label.setPixmap(pixmap)
 		label.resize(screen_width, screen_height)
@@ -86,7 +91,7 @@ class MainWindow(QWidget):
 
 		vert_inner_h4 = QHBoxLayout()
 		panel5_widget = QLabel()
-		movie = QMovie("giphy.gif")
+		movie = QMovie("res/gif/giphy.gif")
 		movie.setScaledSize(QtCore.QSize(screen_width*0.3-30, screen_width*0.3-30))
 		panel5_widget.setMovie(movie)
 		movie.start()
