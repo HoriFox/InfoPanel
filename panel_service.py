@@ -17,11 +17,11 @@ class MainWindow(QWidget):
 		super().__init__()
 		size = screen.size()
 		# Unlock to prod
-		#screen_width = size.width()
-		#screen_height = size.height()
+		screen_width = size.width()
+		screen_height = size.height()
 		# Lock to prod
-		screen_width = 388
-		screen_height = 690
+		#screen_width = 388
+		#screen_height = 690
 		self.coef_width = screen_width / self.dev_screen_width
 		self.coef_height = screen_height / self.dev_screen_height
 		print(self.coef_width, self.coef_height)
@@ -48,7 +48,7 @@ class MainWindow(QWidget):
 		self.time_widget.setStyleSheet("font-size:%sPX;color:#bdbdbd;" % self.fix(35))
 		hb_time.addWidget(self.time_widget)
 		self.date_widget = QLabel()
-		self.date_widget.setStyleSheet("font-size:%sPX;color:#bdbdbd;margin-top:%sPX;" % self.fix([15, 3]))
+		self.date_widget.setStyleSheet("font-size:%sPX;color:#bdbdbd;margin-top:%sPX;" % self.fix([15, 6]))
 		hb_time.addWidget(self.date_widget)
 		hb_time.setAlignment(self.date_widget, Qt.AlignTop)
 		hb_time.addStretch()
