@@ -1,9 +1,10 @@
-#!/usr/bin/python
+#!/bin/python3
+
 import sys
 import platform
 import requests
 import json
-from subprocess import call
+from subprocess import call, Popen, PIPE
 from picamera import PiCamera
 from gpiozero import MotionSensor
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QGraphicsOpacityEffect
@@ -28,7 +29,6 @@ class MainWindow(QWidget):
 	delay_on_tv = 10
 
 	#Tech
-	power_tv = False
 	timeout_on_tv = 0
 	time_hibernation = 0
 
@@ -40,6 +40,13 @@ class MainWindow(QWidget):
             self.media_res = []
             #self.camera = PiCamera()
             self.pir_sensor = MotionSensor(MOTION_SENSOR_PIN)
+            
+            # Get current power status tv
+            status_tv = Popen('echo pow 0 | cec-client -s -d 1 | grep "standby"', shell=True, stdout=PIPE)
+            self.power_tv = True if len(status_tv.stdout.read()) == 0 else False
+            if self.power_tv:
+                    self.timeout_on_tv = self.delay_on_tv
+            print('[INFO] Current power status tv:', 'on' if self.power_tv else 'off')
 
             self.calculation_size(screen)
             self.init_timers()
@@ -65,8 +72,8 @@ class MainWindow(QWidget):
             self.coef_height = self.screen_height / self.dev_screen_height
             self.setWindowFlag(Qt.FramelessWindowHint)
             #self.showMaximized()
-            print('[DEBUG] Window coefficients - c_width:', self.coef_width, 'c_height:', self.coef_height)
-            print('[DEBUG] Window size - width:', self.screen_width, 'height:', self.screen_height)
+            print('[DEBUG] Window coefficients - c_width:', round(self.coef_width, 3), ', c_height:', round(self.coef_height, 3))
+            print('[DEBUG] Window size - width:', self.screen_width, ', height:', self.screen_height)
             self.resize(self.screen_width, self.screen_height)
 		
 		
@@ -122,14 +129,14 @@ class MainWindow(QWidget):
 			% self.fix(4))
 		weather_content_v = QHBoxLayout()
 		self.weather_img = QLabel()
-		pixmap = QPixmap('res/img/weather_pack/10d.png')
-		pixmap = pixmap.scaled(self.fix(100), self.fix(100), QtCore.Qt.KeepAspectRatio)
-		self.weather_img.setPixmap(pixmap)
+		#pixmap = QPixmap('res/img/weather_pack/10d.png')
+		#pixmap = pixmap.scaled(self.fix(100), self.fix(100), QtCore.Qt.KeepAspectRatio)
+		#self.weather_img.setPixmap(pixmap)
 		weather_content_v.addWidget(self.weather_img)
 		self.weather_text = QLabel("update...")
 		self.weather_text.setStyleSheet(
 			"font-size:%sPX;color:#eaf0ff;" 
-			% self.fix(18))
+			% self.fix(14))
 		weather_content_v.addWidget(self.weather_text)
 		weather_content_v.addStretch()
 		weather_layout.addWidget(back_weather_widget, 0, 0)
@@ -227,9 +234,25 @@ class MainWindow(QWidget):
 		#vertical_l.addLayout(vert_inner_h5)
 
 		vertical_l.addStretch()
+		
+		# >>> 1 panel in line
+		layout_h = QHBoxLayout()
+		self.debug_widget = QLabel("debug line")
+		self.debug_widget.setStyleSheet(
+			"background-color: #e1e9fd;border-radius:%sPX;font-size:%sPX;color:#2f2f2f;padding:%sPX;" 
+			% self.fix([4, 7, 10]))
+		layout_h.addWidget(self.debug_widget)
+		vertical_l.addLayout(layout_h)
+		# <<< 1 panel in line
 
 		# <<<
 		self.setLayout(vertical_l)
+
+
+	def log(self, *message):
+            print_mes = ' '.join(map(str, message))
+            print(print_mes)
+            self.debug_widget.setText(print_mes)
 
 
 	def fixed_update(self):
@@ -237,17 +260,17 @@ class MainWindow(QWidget):
             Method of constant fixed update every 1 second
             """
             sensor_value = self.pir_sensor.motion_detected
-            #print('[DEBUG] Sensor:', sensor_value)
+            #self.log('[DEBUG] Sensor:', sensor_value)
             if self.power_tv:
                     if not sensor_value:
                             if self.timeout_on_tv != 0:
                                     self.timeout_on_tv -= 1
-                                    print('[DEBUG]', self.timeout_on_tv)
+                                    self.log('[DEBUG]', self.timeout_on_tv)
                             else:
                                     self.hibernation()
                                     self.power_tv = False
                     else:
-                            #print('[DEBUG] Yet move. Set delay timeout')
+                            self.log('[DEBUG] Motion found. Set delay')
                             self.timeout_on_tv = self.delay_on_tv
             else:
                     if sensor_value:
@@ -267,7 +290,7 @@ class MainWindow(QWidget):
             """
             Method switch the panel to hibernation
             """
-            print('[INFO] Turn off panel')
+            self.log('[INFO] Turn off panel')
             call("echo standby 0 | cec-client -s -d 1 > /dev/null", shell=True)
             self.time_hibernation = 0
             
@@ -280,7 +303,7 @@ class MainWindow(QWidget):
             """
             Method switch the panel to awake
             """
-            print('[INFO] Turn on panel')
+            self.log('[INFO] Turn on panel')
             call("echo on 0 | cec-client -s -d 1 > /dev/null", shell=True)
             
             # 5 min update weather
@@ -309,19 +332,19 @@ class MainWindow(QWidget):
             """
             Method update weather label
             """
-            print('[INFO] Weather updated')
+            self.log('[INFO] Weather updated')
             try:
-                    res = requests.get("http://api.openweathermap.org/data/2.5/weather",
-                        params={'id': CITY_ID, 'units': 'metric', 'lang': 'ru', 'APPID': WEATHER_API_KEY})
-                    data = res.json()
+                    #res = requests.get("http://api.openweathermap.org/data/2.5/weather",
+                    #    params={'id': CITY_ID, 'units': 'metric', 'lang': 'ru', 'APPID': WEATHER_API_KEY})
+                    #data = res.json()
 
                     # temporarily
-                    #with open('stat.txt', encoding='utf-8', errors='ignore') as stat:
-                    #   content = stat.read().replace('\'', '\"')
-                    #   data = json.loads(content)
+                    with open('stat.txt', encoding='utf-8', errors='ignore') as stat:
+                       content = stat.read().replace('\'', '\"')
+                       data = json.loads(content)
 
                     pixmap = QPixmap('res/img/weather_pack/%s.png' % data['weather'][0]['icon'])
-                    pixmap = pixmap.scaled(self.fix(100), self.fix(100), QtCore.Qt.KeepAspectRatio)
+                    pixmap = pixmap.scaled(self.fix(50), self.fix(50), QtCore.Qt.KeepAspectRatio)
                     self.weather_img.setPixmap(pixmap)
 
                     self.weather_text.setText('%s\n%s...%s...%s' % (data['weather'][0]['description'], 
@@ -329,7 +352,7 @@ class MainWindow(QWidget):
                                                round(data['main']['temp']), 
                                                round(data['main']['temp_max'])))
             except Exception as e:
-                    print("[ERROR] Exception (find):", e)
+                    self.log("[ERROR] Exception (find):", e)
         
         
 	def fix(self, size, side='w'):
