@@ -3,6 +3,9 @@ import sys
 import platform
 import requests
 import json
+from subprocess import call
+from picamera import PiCamera
+from gpiozero import MotionSensor
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QGraphicsOpacityEffect
 from PyQt5 import QtCore, QtGui
 from PyQt5.QtGui import QPixmap, QFont, QMovie
@@ -13,54 +16,73 @@ from lib.access import WEATHER_API_KEY
 
 
 RELEASE_PROD='5.10.17-v7l+'
-CITY_NAME='Moscow,RU'
+#CITY_NAME='Moscow,RU'
 CITY_ID=524901 #'Moscow,RU'
+MOTION_SENSOR_PIN = 21
 
 
 class MainWindow(QWidget):
 
 	dev_screen_width = 388
 	dev_screen_height = 690
-	
-	def __init__(self, screen):
-		super().__init__()
-		self.setWindowIcon(QtGui.QIcon('icon.ico'))
+	delay_on_tv = 10
 
-		self.calculation_size(screen)
-		self.init_timers()
-		self.init_background()
-		self.arrangement_content()
-		
-		#special update
-		self.update_weather()
-		
-		
+	#Tech
+	power_tv = False
+	timeout_on_tv = 0
+	time_hibernation = 0
+
+
+	def __init__(self, screen):
+            super().__init__()
+            self.setWindowIcon(QtGui.QIcon('icon.ico'))
+
+            self.media_res = []
+            #self.camera = PiCamera()
+            self.pir_sensor = MotionSensor(MOTION_SENSOR_PIN)
+
+            self.calculation_size(screen)
+            self.init_timers()
+            self.init_background()
+            self.arrangement_content()
+            
+                #special update
+            self.update_weather()
+
+
 	def calculation_size(self, screen):
-		size = screen.size()
-		if platform.release() == RELEASE_PROD:
-			self.screen_width = size.width()
-			self.screen_height = size.height()
-		else:
-			self.screen_width = 388
-			self.screen_height = 690
-		self.coef_width = self.screen_width / self.dev_screen_width
-		self.coef_height = self.screen_height / self.dev_screen_height
-		self.setWindowFlag(Qt.FramelessWindowHint)
-		#self.showMaximized()
-		print('[DEBUG] Window coefficients - c_width:', self.coef_width, 'c_height:', self.coef_height)
-		print('[DEBUG] Window size - width:', self.screen_width, 'height:', self.screen_height)
-		self.resize(self.screen_width, self.screen_height)
+            """
+            Method auto rescale windows size and calc coefficient
+            """
+            size = screen.size()
+            if platform.release() == RELEASE_PROD:
+                    self.screen_width = size.width()
+                    self.screen_height = size.height()
+            else:
+                    self.screen_width = 388
+                    self.screen_height = 690
+            self.coef_width = self.screen_width / self.dev_screen_width
+            self.coef_height = self.screen_height / self.dev_screen_height
+            self.setWindowFlag(Qt.FramelessWindowHint)
+            #self.showMaximized()
+            print('[DEBUG] Window coefficients - c_width:', self.coef_width, 'c_height:', self.coef_height)
+            print('[DEBUG] Window size - width:', self.screen_width, 'height:', self.screen_height)
+            self.resize(self.screen_width, self.screen_height)
 		
 		
 	def init_timers(self):
-		self.timer_time_date = QTimer()
-		self.timer_time_date.setInterval(1000) # 1 sec
-		self.timer_time_date.timeout.connect(self.update_date_time)
-		self.timer_time_date.start()
-		self.timer_weather = QTimer()
-		self.timer_weather.setInterval(60000) # 60 sec
-		self.timer_weather.timeout.connect(self.update_weather)
-		self.timer_weather.start()
+            # Tech timer
+            self.timer_fixed_update = QTimer()
+            self.timer_fixed_update.setInterval(1000) # 1 sec
+            self.timer_fixed_update.timeout.connect(self.fixed_update)
+            self.timer_fixed_update.start()
+            
+            #self.timers = []
+            #timer_weather = QTimer()
+            #timer_weather.setInterval(30 * 60 * 1000) # 30 min
+            #timer_weather.timeout.connect(self.update_weather)
+            #timer_weather.start()
+            #self.timers['timer_weather'] = timer_weather
 		
 		
 	def init_background(self):
@@ -173,14 +195,23 @@ class MainWindow(QWidget):
 		#vertical_l.addLayout(vert_inner_h3)
 		# <<< 1 panel in line | opacity
 
+		#layout_h = QHBoxLayout()
+		#camera_preview_widget = QLabel()
+		#pixmap = QPixmap('res/img/back_v3.png')
+		#pixmap = pixmap.scaled(400, 300, QtCore.Qt.KeepAspectRatio)
+		#camera_preview_widget.setPixmap(pixmap)
+		#layout_h.addWidget(camera_preview_widget)
+		#vertical_l.addLayout(layout_h)
 
 		# >>> 1 gif image
 		layout_h = QHBoxLayout()
 		git_image_widget = QLabel()
-		movie = QMovie("res/gif/giphy.gif")
-		movie.setScaledSize(QtCore.QSize(self.screen_width*0.3-30, self.screen_width*0.3-30))
-		git_image_widget.setMovie(movie)
-		movie.start()
+		gif_movie = QMovie("res/gif/giphy.gif")
+		gif_movie.setScaledSize(QtCore.QSize(self.screen_width*0.3-30, self.screen_width*0.3-30))
+		git_image_widget.setMovie(gif_movie)
+		if self.power_tv:
+			gif_movie.start()
+		self.media_res.append(gif_movie)
 		layout_h.addWidget(git_image_widget)
 		vertical_l.addLayout(layout_h)
 		# <<< 1 gif image
@@ -199,53 +230,124 @@ class MainWindow(QWidget):
 
 		# <<<
 		self.setLayout(vertical_l)
-	
+
+
+	def fixed_update(self):
+            """
+            Method of constant fixed update every 1 second
+            """
+            sensor_value = self.pir_sensor.motion_detected
+            #print('[DEBUG] Sensor:', sensor_value)
+            if self.power_tv:
+                    if not sensor_value:
+                            if self.timeout_on_tv != 0:
+                                    self.timeout_on_tv -= 1
+                                    print('[DEBUG]', self.timeout_on_tv)
+                            else:
+                                    self.hibernation()
+                                    self.power_tv = False
+                    else:
+                            #print('[DEBUG] Yet move. Set delay timeout')
+                            self.timeout_on_tv = self.delay_on_tv
+            else:
+                    if sensor_value:
+                            self.awake()
+                            self.power_tv = True
+                            self.timeout_on_tv = self.delay_on_tv
+                
+            # Update block
+            if not self.power_tv:
+                self.time_hibernation += 1
+                return
+                
+            self.update_date_time()
+        
+        
+	def hibernation(self):
+            """
+            Method switch the panel to hibernation
+            """
+            print('[INFO] Turn off panel')
+            call("echo standby 0 | cec-client -s -d 1 > /dev/null", shell=True)
+            self.time_hibernation = 0
+            
+            #Stop all UI update
+            for item in self.media_res:
+                item.stop()
+            
+            
+	def awake(self):
+            """
+            Method switch the panel to awake
+            """
+            print('[INFO] Turn on panel')
+            call("echo on 0 | cec-client -s -d 1 > /dev/null", shell=True)
+            
+            # 5 min update weather
+            # Bad implementation
+            # In this case, if you constantly walk nearby
+            # before the counter becomes more than 5 minutes,
+            # then there will be no update
+            if self.time_hibernation >= 60 * 5:
+                self.update_weather
+                
+            #Start all UI update
+            for item in self.media_res:
+                item.start()
         
 	def update_date_time(self):
-        	time = QDateTime.currentDateTime()
-        	date_time_display = time.toString('hh:mm:ss|dd.MM.yyyy dddd').split('|')
-        	self.time_widget.setText(date_time_display[0])
-        	self.date_widget.setText(date_time_display[1])
+            """
+            Method update date and time label
+            """
+            time = QDateTime.currentDateTime()
+            date_time_display = time.toString('hh:mm:ss|dd.MM.yyyy dddd').split('|')
+            self.time_widget.setText(date_time_display[0])
+            self.date_widget.setText(date_time_display[1])
         
         
 	def update_weather(self):
-		print('[INFO] Weather updated')
-		try:
-			#res = requests.get("http://api.openweathermap.org/data/2.5/weather",
-			#	 params={'id': CITY_ID, 'units': 'metric', 'lang': 'ru', 'APPID': WEATHER_API_KEY})
-			#data = res.json()
+            """
+            Method update weather label
+            """
+            print('[INFO] Weather updated')
+            try:
+                    res = requests.get("http://api.openweathermap.org/data/2.5/weather",
+                        params={'id': CITY_ID, 'units': 'metric', 'lang': 'ru', 'APPID': WEATHER_API_KEY})
+                    data = res.json()
 
-			# temporarily
-			with open('stat.txt', encoding='utf-8', errors='ignore') as stat:
-				content = stat.read().replace('\'', '\"')
-				data = json.loads(content)
+                    # temporarily
+                    #with open('stat.txt', encoding='utf-8', errors='ignore') as stat:
+                    #   content = stat.read().replace('\'', '\"')
+                    #   data = json.loads(content)
 
-			pixmap = QPixmap('res/img/weather_pack/%s.png' % data['weather'][0]['icon'])
-			pixmap = pixmap.scaled(self.fix(100), self.fix(100), QtCore.Qt.KeepAspectRatio)
-			self.weather_img.setPixmap(pixmap)
-			
-			self.weather_text.setText('%s\n%s...%s...%s' % (data['weather'][0]['description'], 
-								       round(data['main']['temp_min']), 
-								       round(data['main']['temp']), 
-								       round(data['main']['temp_max'])))
-		except Exception as e:
-			print("[ERROR] Exception (find):", e)
+                    pixmap = QPixmap('res/img/weather_pack/%s.png' % data['weather'][0]['icon'])
+                    pixmap = pixmap.scaled(self.fix(100), self.fix(100), QtCore.Qt.KeepAspectRatio)
+                    self.weather_img.setPixmap(pixmap)
+
+                    self.weather_text.setText('%s\n%s...%s...%s' % (data['weather'][0]['description'], 
+                                               round(data['main']['temp_min']), 
+                                               round(data['main']['temp']), 
+                                               round(data['main']['temp_max'])))
+            except Exception as e:
+                    print("[ERROR] Exception (find):", e)
+        
         
 	def fix(self, size, side='w'):
-		if type(size) == list:
-			return tuple(map(lambda x: round(x * self.coef_width if side=='w' else self.coef_height), size))
-		else:
-			return round(size * self.coef_width if side=='w' else self.coef_height)
-			
-			
-def get_weather_status():
-	pass
+            """
+            Method size adjustment to target platform
+            size - var to adjustment
+            side = {w, h} - side to use for adjustment
+            """
+            if type(size) == list:
+                    return tuple(map(lambda x: round(x * self.coef_width if side=='w' else self.coef_height), size))
+            else:
+                    return round(size * self.coef_width if side=='w' else self.coef_height)
 
 
 if __name__ == '__main__':
-	app = QApplication(sys.argv)
-	screen = app.primaryScreen()
-	window = MainWindow(screen)
-	window.show()
+        app = QApplication(sys.argv)
+        screen = app.primaryScreen()
+        window = MainWindow(screen)
+        window.show()
 
-	sys.exit(app.exec_())
+        sys.exit(app.exec_())
