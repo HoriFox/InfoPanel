@@ -10,16 +10,21 @@ import imutils
 import pickle
 import cv2
 import time
+import random
 from subprocess import call, Popen, PIPE
 from picamera import PiCamera
 from gpiozero import MotionSensor
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QGraphicsOpacityEffect
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, 
+QHBoxLayout, QGridLayout, QPushButton, QGraphicsOpacityEffect, QGraphicsDropShadowEffect)
 from PyQt5 import QtCore, QtGui
-from PyQt5.QtGui import QPixmap, QFont, QMovie, QImage
+from PyQt5.QtGui import QPixmap, QFont, QMovie, QImage, QPainter, QPainterPath
 from PyQt5.QtCore import QTimer, QTime, Qt, QUrl, QDateTime, QThread, pyqtSignal, pyqtSlot
+from newsapi import NewsApiClient
 #from PyQt5.QtMultimedia import QMediaContent, QMediaPlayer
 #from PyQt5.QtMultimediaWidgets import QVideoWidget
-from lib.access import WEATHER_API_KEY
+from lib.access import WEATHER_API_KEY, NEWS_API_KEY
+
+BLOCK_TIME_UPDATE = 'последнее обновление в %s'
 
 encodingsP = "lib/snn/encodings.pickle"
 cascade = "lib/snn/haarcascade_frontalface_default.xml"
@@ -30,108 +35,94 @@ CITY_ID=524901 #'Moscow,RU'
 MOTION_SENSOR_PIN = 21
 
 
-class Thread(QThread):
-	currentname = "unknown"
-	pause = False
-	changePixmap = pyqtSignal(QImage)
+class CameraThread(QThread):
+    current_name = "Unknown"
+    pause = False
+    changePixmap = pyqtSignal(QImage)
 
-	def __init__(self, pause, data, detector, vs):
-	    super().__init__()
-	    self.pause = pause
-	    self.data = data
-	    self.detector = detector
-	    self.vs = vs 
+    def __init__(self, mv, pause, data, detector, vs):
+        super().__init__()
+        self.mv = mv
+        self.pause = pause
+        self.data = data
+        self.detector = detector
+        self.vs = vs 
 
-	def set_pause(self):
-	    self.pause = True
-	    
-	def set_resume(self):
-	    self.pause = False
+    def set_pause(self):
+        self.pause = True
+        
+    def set_resume(self):
+        self.pause = False
 
-	def run(self):
-		while True:
-			if not self.pause:
-			    frame = self.vs.read()
-			    frame = imutils.resize(frame, width=500)
-			
-			    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-			    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    def run(self):
+        while True:
+            if not self.pause:
+                frame = self.vs.read()
+                frame = imutils.resize(frame, width=500)
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                rects = self.detector.detectMultiScale(gray, scaleFactor=1.1, 
+                    minNeighbors=5, minSize=(30, 30),
+                    flags=cv2.CASCADE_SCALE_IMAGE)
+                boxes = [(y, x + w, y + h, x) for (x, y, w, h) in rects]
+                encodings = face_recognition.face_encodings(rgb, boxes)
+                names = []
+                for encoding in encodings:
+                    matches = face_recognition.compare_faces(self.data["encodings"],
+                        encoding)
+                    name = "Unknown"
 
-			    rects = self.detector.detectMultiScale(gray, scaleFactor=1.1, 
-				    minNeighbors=5, minSize=(30, 30),
-				    flags=cv2.CASCADE_SCALE_IMAGE)
+                    if True in matches:
+                        matchedIdxs = [i for (i, b) in enumerate(matches) if b]
+                        counts = {}
+                        for i in matchedIdxs:
+                            name = self.data["names"][i]
+                            counts[name] = counts.get(name, 0) + 1
+                        name = max(counts, key=counts.get)
+                        if self.current_name != name:
+                            self.current_name = name
+                            self.mv.change_person(self.current_name)
+                    names.append(name)
+                for ((top, right, bottom, left), name) in zip(boxes, names):
+                    cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 225), 2)
+                    y = top - 15 if top - 15 > 15 else top + 15
+                    cv2.putText(frame, name, (left, y), cv2.FONT_HERSHEY_SIMPLEX, .8, (0, 255, 255), 2)
+                rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                h, w, ch = rgbImage.shape
+                bytesPerLine = ch * w
+                convertToQtFormat = QImage(rgbImage.data, w, h, bytesPerLine, QImage.Format_RGB888)
+                #convertToQtFormat.setStyleSheet("border-bottom-left-radius: 10px;")
+                # maybe this?
+                #image = qimage2ndarray.array2qimage(frame)
+                p = convertToQtFormat.scaled(450, 350, Qt.KeepAspectRatio)	
+                
+                self.changePixmap.emit(p)
+                
+            time.sleep(1.0)
 
-			    boxes = [(y, x + w, y + h, x) for (x, y, w, h) in rects]
-
-			    encodings = face_recognition.face_encodings(rgb, boxes)
-			    names = []
-
-			    for encoding in encodings:
-				    matches = face_recognition.compare_faces(self.data["encodings"],
-					    encoding)
-				    name = "Unknown"
-
-				    if True in matches:
-					    matchedIdxs = [i for (i, b) in enumerate(matches) if b]
-					    counts = {}
-
-					    for i in matchedIdxs:
-						    name = self.data["names"][i]
-						    counts[name] = counts.get(name, 0) + 1
-
-					    name = max(counts, key=counts.get)
-			    
-					    if self.currentname != name:
-						    self.currentname = name
-						    #print(self.currentname)
-
-				    names.append(name)
-
-			    for ((top, right, bottom, left), name) in zip(boxes, names):
-				    cv2.rectangle(frame, (left, top), (right, bottom),
-					    (0, 255, 225), 2)
-				    y = top - 15 if top - 15 > 15 else top + 15
-				    cv2.putText(frame, name, (left, y), cv2.FONT_HERSHEY_SIMPLEX,
-					    .8, (0, 255, 255), 2)
-
-			    rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-			    h, w, ch = rgbImage.shape
-			    bytesPerLine = ch * w
-			    convertToQtFormat = QImage(rgbImage.data, w, h, bytesPerLine, QImage.Format_RGB888)
-			    # maybe this?
-			    #image = qimage2ndarray.array2qimage(frame)
-			    p = convertToQtFormat.scaled(640, 480, Qt.KeepAspectRatio)	
-			    
-			    self.changePixmap.emit(p)
-			    
-			time.sleep(1.0)
-		
 
 class MainWindow(QWidget):
+    dev_screen_width = 388
+    dev_screen_height = 690
+    delay_on_tv = 10
+    snn_work = True
+    target_person = "Unknown"
 
-	dev_screen_width = 388
-	dev_screen_height = 690
-	delay_on_tv = 10
+    #Tech
+    timeout_on_tv = 0
+    time_hibernation = 0
 
-	#Tech
-	currentname = "unknown"
-	timeout_on_tv = 0
-	time_hibernation = 0
-
-
-	def __init__(self, screen):
+    def __init__(self, screen):
             super().__init__()
             self.setWindowIcon(QtGui.QIcon('icon.ico'))
 
             self.media_res = []
-
-            self.data = pickle.load(open(encodingsP, "rb"), encoding="latin1")
-            self.detector = cv2.CascadeClassifier(cascade)
-            self.vs = VideoStream(usePiCamera=True).start()
-            time.sleep(2.0)
-	    
+        
             self.pir_sensor = MotionSensor(MOTION_SENSOR_PIN)
             
+            self.newsapi = NewsApiClient(api_key=NEWS_API_KEY)
+
+            print('[DEBUG] Get status power tv')
             # Get current power status tv
             status_tv = Popen('echo pow 0 | cec-client -s -d 1 | grep "standby"', shell=True, stdout=PIPE)
             self.power_tv = True if len(status_tv.stdout.read()) == 0 else False
@@ -139,16 +130,25 @@ class MainWindow(QWidget):
                     self.timeout_on_tv = self.delay_on_tv
             print('[INFO] Current power status tv:', 'on' if self.power_tv else 'off')
 
+            if self.snn_work:
+                print('[DEBUG] Init camera/cv2/thread [> 2 sec]')
+                data = pickle.load(open(encodingsP, "rb"), encoding="latin1")
+                detector = cv2.CascadeClassifier(cascade)
+                vs = VideoStream(usePiCamera=True).start()
+                time.sleep(2.0)
+                self.camera_th = CameraThread(self, not self.power_tv, data, detector, vs)
+
             self.calculation_size(screen)
             self.init_timers()
             self.init_background()
             self.arrangement_content()
             
-                #special update
+            #special update
             self.update_weather()
+            self.update_news()
 
 
-	def calculation_size(self, screen):
+    def calculation_size(self, screen):
             """
             Method auto rescale windows size and calc coefficient
             """
@@ -168,7 +168,7 @@ class MainWindow(QWidget):
             self.resize(self.screen_width, self.screen_height)
 		
 		
-	def init_timers(self):
+    def init_timers(self):
             # Tech timer
             self.timer_fixed_update = QTimer()
             self.timer_fixed_update.setInterval(1000) # 1 sec
@@ -181,191 +181,199 @@ class MainWindow(QWidget):
             #timer_weather.timeout.connect(self.update_weather)
             #timer_weather.start()
             #self.timers['timer_weather'] = timer_weather
-		
-		
-	def init_background(self):
-		label = QLabel(self)
-		pixmap = QPixmap('res/img/back_v3.png')
-		pixmap = pixmap.scaled(self.screen_width, self.screen_height, QtCore.Qt.KeepAspectRatio)
-		label.setPixmap(pixmap)
-		label.resize(self.screen_width, self.screen_height)
-		#label.setScaledContents(True)
+        
+        
+    def init_background(self):
+        label = QLabel(self)
+        pixmap = QPixmap('res/img/back_v3.png')
+        pixmap = pixmap.scaled(self.screen_width, self.screen_height, QtCore.Qt.KeepAspectRatio)
+        label.setPixmap(pixmap)
+        label.resize(self.screen_width, self.screen_height)
 
 
-	@pyqtSlot(QImage)
-	def setImage(self, image):
-	    self.cam_widget.setPixmap(QPixmap.fromImage(image))
+    @pyqtSlot(QImage)
+    def setImage(self, image):
+        # target = QPixmap()  
+        # target.fill(Qt.transparent)
+        # painter = QPainter(target)
+        # path = QPainterPath()
+        # path.addRoundedRect(0, 0, 450, 350, 25, 25)
+        # painter.setClipPath(path)
+        # painter.drawPixmap(0, 0, QPixmap.fromImage(image))
+        self.cam_widget.setPixmap(QPixmap.fromImage(image))
 
 
-	def arrangement_content(self):
-		# >>>
-		vertical_l = QVBoxLayout()
+    def arrangement_content(self):
+        # >>> time/date panel
+        vertical_l = QVBoxLayout()
 
-		hb_time = QHBoxLayout()
-		self.time_widget = QLabel()
-		self.time_widget.setStyleSheet(
-			"font-size:%sPX;color:#eaf0ff;" 
-			% self.fix(35))
-		hb_time.addWidget(self.time_widget)
-		self.date_widget = QLabel()
-		self.date_widget.setStyleSheet(
-			"font-size:%sPX;color:#eaf0ff;margin-top:%sPX;" 
-			% self.fix([15, 6]))
-		hb_time.addWidget(self.date_widget)
-		hb_time.setAlignment(self.date_widget, Qt.AlignTop)
-		hb_time.addStretch()
-		vertical_l.addLayout(hb_time)
-
-
-		# >>> weather panel
-		weather_layout = QGridLayout()
-		back_weather_widget = QLabel()
-		back_weather_widget.setStyleSheet(
-			"background-color: #bcc1ce;border-radius:%sPX;" 
-			% self.fix(4))
-		weather_content_v = QHBoxLayout()
-		self.weather_img = QLabel()
-		#pixmap = QPixmap('res/img/weather_pack/10d.png')
-		#pixmap = pixmap.scaled(self.fix(100), self.fix(100), QtCore.Qt.KeepAspectRatio)
-		#self.weather_img.setPixmap(pixmap)
-		weather_content_v.addWidget(self.weather_img)
-		self.weather_text = QLabel("update...")
-		self.weather_text.setStyleSheet(
-			"font-size:%sPX;color:#eaf0ff;" 
-			% self.fix(14))
-		weather_content_v.addWidget(self.weather_text)
-		weather_content_v.addStretch()
-		weather_layout.addWidget(back_weather_widget, 0, 0)
-		weather_layout.addLayout(weather_content_v, 0, 0)
-		vertical_l.addLayout(weather_layout)
-		# <<< weather panel
-		
-		
-		# >>> 1 panel in line
-		layout_h = QHBoxLayout()
-		what_buy_widget = QLabel("Panel3")
-		what_buy_widget.setStyleSheet(
-			"background-color: #e1e9fd;border-radius:%sPX;font-size:%sPX;color:#2f2f2f;padding:%sPX;" 
-			% self.fix([4, 15, 10]))
-		what_buy_widget.setText("Что купить? (тестовая)\n> Сыр\n> Молоко\n> Хлеб")
-		layout_h.addWidget(what_buy_widget)
-		vertical_l.addLayout(layout_h)
-		# <<< 1 panel in line
-		
-		# >>> 1 panel in line
-		layout_h = QHBoxLayout()
-		self.cam_widget = QLabel("Camera panel")
-		#self.cam_widget.resize(400, 300)
-		self.cam_widget.setStyleSheet(
-			"background-color: #e1e9fd;border-radius:%sPX;font-size:%sPX;color:#2f2f2f;padding:%sPX;" 
-			% self.fix([4, 15, 10]))
-		self.camera_th = Thread(not self.power_tv, self.data, self.detector, self.vs)
-		self.camera_th.changePixmap.connect(self.setImage)
-		self.camera_th.start()
-		layout_h.addWidget(self.cam_widget)
-		vertical_l.addLayout(layout_h)
-		# <<< 1 panel in line
-			
-		
-		# >>> 2 panel in line
-		#vert_inner_h1 = QHBoxLayout()
-		#panel1_widget = QLabel("Panel1")
-		#panel1_widget.setStyleSheet(
-		#	"background-color: #e1e9fd;border-radius:%sPX;font-size:%sPX;color:#2f2f2f;padding:%sPX;" 
-		#	% self.fix([4, 15, 10]))
-		#vert_inner_h1.addWidget(panel1_widget)
-		#panel2_widget = QLabel("Panel2")
-		#panel2_widget.setStyleSheet(
-		#	"background-color: #e1e9fd;border-radius:%sPX;font-size:%sPX;color:#2f2f2f;padding:%sPX;" 
-		#	% self.fix([4, 15, 10]))
-		#vert_inner_h1.addWidget(panel2_widget)
-		#vertical_l.addLayout(vert_inner_h1)
-		# <<< 2 panel in line
+        hb_time = QHBoxLayout()
+        self.time_widget = QLabel('ВРЕМЯ')
+        self.time_widget.setStyleSheet(
+            "font-size:%sPX;color:#eaf0ff;" 
+            % self.fix(35))
+        hb_time.addWidget(self.time_widget)
+        self.date_widget = QLabel('ДАТА/ДЕНЬ НЕДЕЛИ')
+        self.date_widget.setStyleSheet(
+            "font-size:%sPX;color:#eaf0ff;margin-top:%sPX;" 
+            % self.fix([15, 6]))
+        hb_time.addWidget(self.date_widget)
+        hb_time.setAlignment(self.date_widget, Qt.AlignTop)
+        hb_time.addStretch()
+        vertical_l.addLayout(hb_time)
+        # <<< time/date panel
 
 
-		# >>> 1 panel in line | opacity
-		#vert_inner_h2 = QHBoxLayout()
-		#panel3_widget = QLabel("Panel3")
-		#panel3_widget.setStyleSheet(
-		#	"background-color: #e1e9fd;border-radius:%sPX;font-size:%sPX;color:#2f2f2f;padding:%sPX;" 
-		#	% self.fix([4, 15, 10]))
-		#op=QGraphicsOpacityEffect(self)
-		#op.setOpacity(0.60)
-		#panel3_widget.setGraphicsEffect(op)
-		#panel3_widget.setText("Full line block\nAnd some line\nYet and yet\n0.6 opacity")
-		#vert_inner_h2.addWidget(panel3_widget)
-		#vertical_l.addLayout(vert_inner_h2)
-		# <<< 1 panel in line | opacity
+        # >>> weather panel
+        weather_layout = QGridLayout()
+        back_weather_widget = QLabel()
+        back_weather_widget.setStyleSheet(
+            "background-color: rgba(188, 193, 206, 120);border-radius:%sPX;" 
+            % self.fix(4))
+
+        weather_content_v = QVBoxLayout()
+        weather_content_h = QHBoxLayout()
+        self.weather_img = QLabel()
+        weather_content_h.addWidget(self.weather_img)
+        self.weather_text = QLabel("обновление...")
+        self.weather_text.setStyleSheet(
+            "font-size:%sPX;color:#eaf0ff;" 
+            % self.fix(14))
+        weather_content_h.addWidget(self.weather_text)
+        weather_content_h.addStretch()
+        weather_content_v.addLayout(weather_content_h)
+
+        self.weather_time_update_text = QLabel("время последнего обновления погоды")
+        self.weather_time_update_text.setStyleSheet(
+            "font-size:%sPX;color:#eaf0ff;padding:0 0 %sPX %sPX;" 
+            % self.fix([8, 10, 10]))
+        weather_content_v.addWidget(self.weather_time_update_text)
+
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        back_weather_widget.setGraphicsEffect(shadow)
+
+        weather_layout.addWidget(back_weather_widget, 0, 0)
+        weather_layout.addLayout(weather_content_v, 0, 0)
+        vertical_l.addLayout(weather_layout)
+        # <<< weather panel
 
 
-		# >>> 1 panel in line | opacity
-		#vert_inner_h3 = QHBoxLayout()
-		#panel4_widget = QLabel("Panel3")
-		#panel4_widget.setStyleSheet(
-		#	"background-color: #e1e9fd;border-radius:%sPX;font-size:%sPX;color:#2f2f2f;padding:%sPX;" 
-		#	% self.fix([4, 15, 10]))
-		#op=QGraphicsOpacityEffect(self)
-		#op.setOpacity(0.30)
-		#panel4_widget.setGraphicsEffect(op)
-		#panel4_widget.setText("0.3 opacity")
-		#vert_inner_h3.addWidget(panel4_widget)
-		#vertical_l.addLayout(vert_inner_h3)
-		# <<< 1 panel in line | opacity
+        # >>> news panel
+        news_layout = QGridLayout()
+        back_news_widget = QLabel()
+        back_news_widget.setStyleSheet(
+            "background-color: rgba(225, 233, 253, 120);border-radius:%sPX;" 
+            % self.fix(4))
 
-		#layout_h = QHBoxLayout()
-		#camera_preview_widget = QLabel()
-		#pixmap = QPixmap('res/img/back_v3.png')
-		#pixmap = pixmap.scaled(400, 300, QtCore.Qt.KeepAspectRatio)
-		#camera_preview_widget.setPixmap(pixmap)
-		#layout_h.addWidget(camera_preview_widget)
-		#vertical_l.addLayout(layout_h)
+        news_content_v = QVBoxLayout()
+        self.news_widget = QLabel("панель новостей")
+        self.news_widget.setStyleSheet(
+            "font-size:%sPX;color:#eaf0ff;padding:%sPX;" 
+            % self.fix([12, 10]))
+        self.news_widget.setWordWrap(True)
+        news_content_v.addWidget(self.news_widget)
 
-		# >>> 1 gif image
-		layout_h = QHBoxLayout()
-		git_image_widget = QLabel()
-		gif_movie = QMovie("res/gif/giphy.gif")
-		gif_movie.setScaledSize(QtCore.QSize(self.screen_width*0.3-30, self.screen_width*0.3-30))
-		git_image_widget.setMovie(gif_movie)
-		if self.power_tv:
-			gif_movie.start()
-		self.media_res.append(gif_movie)
-		layout_h.addWidget(git_image_widget)
-		vertical_l.addLayout(layout_h)
-		# <<< 1 gif image
+        self.news_time_update_text = QLabel("время последнего обновления новостей")
+        self.news_time_update_text.setStyleSheet(
+            "font-size:%sPX;color:#eaf0ff;padding:0 0 %sPX %sPX;" 
+            % self.fix([8, 10, 10]))
+        news_content_v.addWidget(self.news_time_update_text)
+
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        back_news_widget.setGraphicsEffect(shadow)
+
+        news_layout.addWidget(back_news_widget, 0, 0)
+        news_layout.addLayout(news_content_v, 0, 0)
+        vertical_l.addLayout(news_layout)
+        # <<< news panel
 
 
-		#vert_inner_h5 = QHBoxLayout()
-		#video_widget = QVideoWidget()
-		#media_player = QMediaPlayer()
-		#media_player.setVideoOutput(video_widget)
-		#media_player.setMedia(QMediaContent(QUrl.fromLocalFile('video.mp4')))
-		#media_player.play()
-		#vert_inner_h5.addWidget(video_widget)
-		#vertical_l.addLayout(vert_inner_h5)
+        # >>> cam and todo list panel
+        cam_todo_content_h = QHBoxLayout()
 
-		vertical_l.addStretch()
-		
-		# >>> 1 panel in line
-		layout_h = QHBoxLayout()
-		self.debug_widget = QLabel("debug line")
-		self.debug_widget.setStyleSheet(
-			"background-color: #e1e9fd;border-radius:%sPX;font-size:%sPX;color:#2f2f2f;padding:%sPX;" 
-			% self.fix([4, 7, 10]))
-		layout_h.addWidget(self.debug_widget)
-		vertical_l.addLayout(layout_h)
-		# <<< 1 panel in line
+        self.cam_widget = QLabel("панель камеры")
+        self.cam_widget.setStyleSheet(
+            "background-color: rgba(225, 233, 253, 120);border-radius:%sPX;font-size:%sPX;color:#eaf0ff;padding:%sPX;" 
+            % self.fix([4, 12, 10]))
+        if self.snn_work:
+            self.camera_th.changePixmap.connect(self.setImage)
+            self.camera_th.start()
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        self.cam_widget.setGraphicsEffect(shadow)
+        cam_todo_content_h.addWidget(self.cam_widget)
 
-		# <<<
-		self.setLayout(vertical_l)
+        self.what_buy_widget = QLabel("панель заметок")
+        self.what_buy_widget.setStyleSheet(
+            "background-color: rgba(225, 233, 253, 120);border-radius:%sPX;font-size:%sPX;color:#eaf0ff;padding:%sPX;" 
+            % self.fix([4, 12, 10]))
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        self.what_buy_widget.setGraphicsEffect(shadow)
+        cam_todo_content_h.addWidget(self.what_buy_widget)
+
+        vertical_l.addLayout(cam_todo_content_h)
+		# <<< cam and todo list panel
+            
+        
+        # >>> 1 panel in line | opacity
+        #vert_inner_h2 = QHBoxLayout()
+        #panel3_widget = QLabel("Panel3")
+        #panel3_widget.setStyleSheet(
+        #	"background-color: #e1e9fd;border-radius:%sPX;font-size:%sPX;color:#2f2f2f;padding:%sPX;" 
+        #	% self.fix([4, 15, 10]))
+        # op=QGraphicsOpacityEffect(self)
+        # op.setOpacity(0.60)
+        # panel3_widget.setGraphicsEffect(op)
+        #panel3_widget.setText("Full line block\nAnd some line\nYet and yet\n0.6 opacity")
+        #vert_inner_h2.addWidget(panel3_widget)
+        #vertical_l.addLayout(vert_inner_h2)
+        # <<< 1 panel in line | opacity
 
 
-	def log(self, *message):
+        # >>> 1 gif image
+        # layout_h = QHBoxLayout()
+        # git_image_widget = QLabel()
+        # gif_movie = QMovie("res/gif/giphy.gif")
+        # gif_movie.setScaledSize(QtCore.QSize(self.screen_width*0.3-30, self.screen_width*0.3-30))
+        # git_image_widget.setMovie(gif_movie)
+        # if self.power_tv:
+        #     gif_movie.start()
+        # self.media_res.append(gif_movie)
+        # layout_h.addWidget(git_image_widget)
+        # vertical_l.addLayout(layout_h)
+        # <<< 1 gif image
+
+
+        vertical_l.addStretch()
+        
+
+        # >>> debug panel
+        layout_h = QHBoxLayout()
+        self.debug_widget = QLabel("строка отладки")
+        self.debug_widget.setStyleSheet(
+            "background-color: rgba(225, 233, 253, 120);border-radius:%sPX;font-size:%sPX;color:#eaf0ff;padding:%sPX;" 
+            % self.fix([4, 7, 10]))
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        self.debug_widget.setGraphicsEffect(shadow)
+        layout_h.addWidget(self.debug_widget)
+        vertical_l.addLayout(layout_h)
+        # <<< debug panel
+
+        # <<<
+        self.setLayout(vertical_l)
+
+
+    def log(self, *message):
             print_mes = ' '.join(map(str, message))
             print(print_mes)
             self.debug_widget.setText(print_mes)
 
 
-	def fixed_update(self):
+    def fixed_update(self):
             """
             Method of constant fixed update every 1 second
             """
@@ -394,9 +402,9 @@ class MainWindow(QWidget):
                 return
                 
             self.update_date_time()
-        
-        
-	def hibernation(self):
+
+
+    def hibernation(self):
             """
             Method switch the panel to hibernation
             """
@@ -407,11 +415,11 @@ class MainWindow(QWidget):
             #Stop all UI update
             for item in self.media_res:
                 item.stop()
-		
+        
             self.camera_th.set_pause()
-            
-            
-	def awake(self):
+
+
+    def awake(self):
             """
             Method switch the panel to awake
             """
@@ -424,16 +432,23 @@ class MainWindow(QWidget):
             # before the counter becomes more than 5 minutes,
             # then there will be no update
             if self.time_hibernation >= 60 * 5:
-                self.update_weather
+                self.update_weather()
+                self.update_news()
+
                 
             #Start all UI update
             for item in self.media_res:
                 item.start()
-		
-            self.camera_th.set_resume()
         
-	
-	def update_date_time(self):
+            self.camera_th.set_resume()
+
+
+    def change_person(self, current_name):
+        self.target_person = current_name
+        self.update_todo_list()
+
+
+    def update_date_time(self):
             """
             Method update date and time label
             """
@@ -441,9 +456,9 @@ class MainWindow(QWidget):
             date_time_display = time.toString('hh:mm:ss|dd.MM.yyyy dddd').split('|')
             self.time_widget.setText(date_time_display[0])
             self.date_widget.setText(date_time_display[1])
-        
-        
-	def update_weather(self):
+
+
+    def update_weather(self):
             """
             Method update weather label
             """
@@ -455,22 +470,59 @@ class MainWindow(QWidget):
 
                     # temporarily
                     with open('stat.txt', encoding='utf-8', errors='ignore') as stat:
-                       content = stat.read().replace('\'', '\"')
-                       data = json.loads(content)
+                        content = stat.read().replace('\'', '\"')
+                        data = json.loads(content)
 
                     pixmap = QPixmap('res/img/weather_pack/%s.png' % data['weather'][0]['icon'])
                     pixmap = pixmap.scaled(self.fix(50), self.fix(50), QtCore.Qt.KeepAspectRatio)
                     self.weather_img.setPixmap(pixmap)
 
                     self.weather_text.setText('%s\n%s...%s...%s' % (data['weather'][0]['description'], 
-                                               round(data['main']['temp_min']), 
-                                               round(data['main']['temp']), 
-                                               round(data['main']['temp_max'])))
+                                                round(data['main']['temp_min']), 
+                                                round(data['main']['temp']), 
+                                                round(data['main']['temp_max'])))
+            
+                    time = QDateTime.currentDateTime()
+                    date_time_display = time.toString('hh:mm:ss')
+                    self.weather_time_update_text.setText(BLOCK_TIME_UPDATE % date_time_display)
             except Exception as e:
                     self.log("[ERROR] Exception (find):", e)
-        
-        
-	def fix(self, size, side='w'):
+
+
+    def update_news(self):
+            """
+            Method update news label
+            """
+            self.log('[INFO] News updated')
+            top_headlines = self.newsapi.get_top_headlines(language='ru')
+            if top_headlines['status'] == 'ok':
+                total = len(top_headlines['articles'])
+                print('[DEBUG] Total news:', total)
+                index_new = random.randint(0, total - 1)
+                print('[DEBUG] Current news:', index_new)
+                news_block = top_headlines['articles'][index_new]
+                #date_time_public = news_block['publishedAt'].replace('Z', '').split('T')
+                #title_show_block = news_block['source']['name'] + ' - ' + date_time_public[0] + ' в ' 
+                #+ date_time_public[1] + '\n'
+                # news_show_message = title_show_block + news_block['title'] + '\n' + news_block['description']
+                self.news_widget.setText('<b>' + news_block['title'] + '</b><br>' + news_block['description'])
+
+                time = QDateTime.currentDateTime()
+                date_time_display = time.toString('hh:mm:ss')
+                self.news_time_update_text.setText(BLOCK_TIME_UPDATE % date_time_display)
+            else:
+                self.news_widget.setText('при загрузке новостей произошла ошибка')
+
+
+    def update_todo_list(self):
+            """
+            Method update todo label
+            """
+            self.log('[INFO] Todo updated by person')
+            self.what_buy_widget.setText("Что купить? (для %s)\n> Сыр\n> Молоко\n> Хлеб" % self.target_person)
+
+
+    def fix(self, size, side='w'):
             """
             Method size adjustment to target platform
             size - var to adjustment
