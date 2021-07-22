@@ -4,23 +4,108 @@ import sys
 import platform
 import requests
 import json
+from imutils.video import VideoStream
+import face_recognition
+import imutils
+import pickle
+import cv2
+import time
 from subprocess import call, Popen, PIPE
 from picamera import PiCamera
 from gpiozero import MotionSensor
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QGraphicsOpacityEffect
 from PyQt5 import QtCore, QtGui
-from PyQt5.QtGui import QPixmap, QFont, QMovie
-from PyQt5.QtCore import QTimer, QTime, Qt, QUrl, QDateTime
+from PyQt5.QtGui import QPixmap, QFont, QMovie, QImage
+from PyQt5.QtCore import QTimer, QTime, Qt, QUrl, QDateTime, QThread, pyqtSignal, pyqtSlot
 #from PyQt5.QtMultimedia import QMediaContent, QMediaPlayer
 #from PyQt5.QtMultimediaWidgets import QVideoWidget
 from lib.access import WEATHER_API_KEY
 
+encodingsP = "lib/snn/encodings.pickle"
+cascade = "lib/snn/haarcascade_frontalface_default.xml"
 
 RELEASE_PROD='5.10.17-v7l+'
 #CITY_NAME='Moscow,RU'
 CITY_ID=524901 #'Moscow,RU'
 MOTION_SENSOR_PIN = 21
 
+
+class Thread(QThread):
+	currentname = "unknown"
+	pause = False
+	changePixmap = pyqtSignal(QImage)
+
+	def __init__(self, pause, data, detector, vs):
+	    super().__init__()
+	    self.pause = pause
+	    self.data = data
+	    self.detector = detector
+	    self.vs = vs 
+
+	def set_pause(self):
+	    self.pause = True
+	    
+	def set_resume(self):
+	    self.pause = False
+
+	def run(self):
+		while True:
+			if not self.pause:
+			    frame = self.vs.read()
+			    frame = imutils.resize(frame, width=500)
+			
+			    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+			    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+			    rects = self.detector.detectMultiScale(gray, scaleFactor=1.1, 
+				    minNeighbors=5, minSize=(30, 30),
+				    flags=cv2.CASCADE_SCALE_IMAGE)
+
+			    boxes = [(y, x + w, y + h, x) for (x, y, w, h) in rects]
+
+			    encodings = face_recognition.face_encodings(rgb, boxes)
+			    names = []
+
+			    for encoding in encodings:
+				    matches = face_recognition.compare_faces(self.data["encodings"],
+					    encoding)
+				    name = "Unknown"
+
+				    if True in matches:
+					    matchedIdxs = [i for (i, b) in enumerate(matches) if b]
+					    counts = {}
+
+					    for i in matchedIdxs:
+						    name = self.data["names"][i]
+						    counts[name] = counts.get(name, 0) + 1
+
+					    name = max(counts, key=counts.get)
+			    
+					    if self.currentname != name:
+						    self.currentname = name
+						    #print(self.currentname)
+
+				    names.append(name)
+
+			    for ((top, right, bottom, left), name) in zip(boxes, names):
+				    cv2.rectangle(frame, (left, top), (right, bottom),
+					    (0, 255, 225), 2)
+				    y = top - 15 if top - 15 > 15 else top + 15
+				    cv2.putText(frame, name, (left, y), cv2.FONT_HERSHEY_SIMPLEX,
+					    .8, (0, 255, 255), 2)
+
+			    rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+			    h, w, ch = rgbImage.shape
+			    bytesPerLine = ch * w
+			    convertToQtFormat = QImage(rgbImage.data, w, h, bytesPerLine, QImage.Format_RGB888)
+			    # maybe this?
+			    #image = qimage2ndarray.array2qimage(frame)
+			    p = convertToQtFormat.scaled(640, 480, Qt.KeepAspectRatio)	
+			    
+			    self.changePixmap.emit(p)
+			    
+			time.sleep(1.0)
+		
 
 class MainWindow(QWidget):
 
@@ -29,6 +114,7 @@ class MainWindow(QWidget):
 	delay_on_tv = 10
 
 	#Tech
+	currentname = "unknown"
 	timeout_on_tv = 0
 	time_hibernation = 0
 
@@ -38,7 +124,12 @@ class MainWindow(QWidget):
             self.setWindowIcon(QtGui.QIcon('icon.ico'))
 
             self.media_res = []
-            #self.camera = PiCamera()
+
+            self.data = pickle.load(open(encodingsP, "rb"), encoding="latin1")
+            self.detector = cv2.CascadeClassifier(cascade)
+            self.vs = VideoStream(usePiCamera=True).start()
+            time.sleep(2.0)
+	    
             self.pir_sensor = MotionSensor(MOTION_SENSOR_PIN)
             
             # Get current power status tv
@@ -101,6 +192,11 @@ class MainWindow(QWidget):
 		#label.setScaledContents(True)
 
 
+	@pyqtSlot(QImage)
+	def setImage(self, image):
+	    self.cam_widget.setPixmap(QPixmap.fromImage(image))
+
+
 	def arrangement_content(self):
 		# >>>
 		vertical_l = QVBoxLayout()
@@ -153,6 +249,20 @@ class MainWindow(QWidget):
 			% self.fix([4, 15, 10]))
 		what_buy_widget.setText("Что купить? (тестовая)\n> Сыр\n> Молоко\n> Хлеб")
 		layout_h.addWidget(what_buy_widget)
+		vertical_l.addLayout(layout_h)
+		# <<< 1 panel in line
+		
+		# >>> 1 panel in line
+		layout_h = QHBoxLayout()
+		self.cam_widget = QLabel("Camera panel")
+		#self.cam_widget.resize(400, 300)
+		self.cam_widget.setStyleSheet(
+			"background-color: #e1e9fd;border-radius:%sPX;font-size:%sPX;color:#2f2f2f;padding:%sPX;" 
+			% self.fix([4, 15, 10]))
+		self.camera_th = Thread(not self.power_tv, self.data, self.detector, self.vs)
+		self.camera_th.changePixmap.connect(self.setImage)
+		self.camera_th.start()
+		layout_h.addWidget(self.cam_widget)
 		vertical_l.addLayout(layout_h)
 		# <<< 1 panel in line
 			
@@ -297,6 +407,8 @@ class MainWindow(QWidget):
             #Stop all UI update
             for item in self.media_res:
                 item.stop()
+		
+            self.camera_th.set_pause()
             
             
 	def awake(self):
@@ -317,7 +429,10 @@ class MainWindow(QWidget):
             #Start all UI update
             for item in self.media_res:
                 item.start()
+		
+            self.camera_th.set_resume()
         
+	
 	def update_date_time(self):
             """
             Method update date and time label
