@@ -83,10 +83,12 @@ class CameraThread(QThread):
                             self.current_name = name
                             self.mv.change_person(self.current_name)
                     names.append(name)
+
                 for ((top, right, bottom, left), name) in zip(boxes, names):
                     cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 225), 2)
                     y = top - 15 if top - 15 > 15 else top + 15
                     cv2.putText(frame, name, (left, y), cv2.FONT_HERSHEY_SIMPLEX, .8, (0, 255, 255), 2)
+
                 rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 h, w, ch = rgbImage.shape
                 bytesPerLine = ch * w
@@ -98,7 +100,7 @@ class CameraThread(QThread):
                 
                 self.changePixmap.emit(p)
                 
-            time.sleep(1.0)
+            time.sleep(0.5)
 
 
 class MainWindow(QWidget):
@@ -490,13 +492,14 @@ class MainWindow(QWidget):
 
 
     def update_news(self):
+            max_index = 5
             """
             Method update news label
             """
             self.log('[INFO] News updated')
             top_headlines = self.newsapi.get_top_headlines(language='ru')
             if top_headlines['status'] == 'ok':
-                total = len(top_headlines['articles'])
+                total = min(len(top_headlines['articles']), max_index)
                 print('[DEBUG] Total news:', total)
                 index_new = random.randint(0, total - 1)
                 print('[DEBUG] Current news:', index_new)
