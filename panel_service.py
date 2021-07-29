@@ -108,11 +108,12 @@ class MainWindow(QWidget):
     dev_screen_height = 690
     delay_on_tv = 10
     snn_work = True
-    target_person = "Unknown"
+    debug_news = False
 
     #Tech
     timeout_on_tv = 0
     time_hibernation = 0
+    target_person = "Unknown"
 
     def __init__(self, screen):
             super().__init__()
@@ -466,14 +467,14 @@ class MainWindow(QWidget):
             """
             self.log('[INFO] Weather updated')
             try:
-                    #res = requests.get("http://api.openweathermap.org/data/2.5/weather",
-                    #    params={'id': CITY_ID, 'units': 'metric', 'lang': 'ru', 'APPID': WEATHER_API_KEY})
-                    #data = res.json()
-
-                    # temporarily
-                    with open('stat.txt', encoding='utf-8', errors='ignore') as stat:
-                        content = stat.read().replace('\'', '\"')
-                        data = json.loads(content)
+                    if self.debug_news:
+                        with open('stat.txt', encoding='utf-8', errors='ignore') as stat:
+                            content = stat.read().replace('\'', '\"')
+                            data = json.loads(content)
+                    else:
+                        res = requests.get("http://api.openweathermap.org/data/2.5/weather",
+                            params={'id': CITY_ID, 'units': 'metric', 'lang': 'ru', 'APPID': WEATHER_API_KEY})
+                        data = res.json()
 
                     pixmap = QPixmap('res/img/weather_pack/%s.png' % data['weather'][0]['icon'])
                     pixmap = pixmap.scaled(self.fix(50), self.fix(50), QtCore.Qt.KeepAspectRatio)
@@ -508,11 +509,16 @@ class MainWindow(QWidget):
                 #title_show_block = news_block['source']['name'] + ' - ' + date_time_public[0] + ' в ' 
                 #+ date_time_public[1] + '\n'
                 # news_show_message = title_show_block + news_block['title'] + '\n' + news_block['description']
-                self.news_widget.setText('<b>' + news_block['title'] + '</b><br>' + news_block['description'])
+                if news_block['title'] == None or news_block['description'] == None:
+                    print('[WARNING] Title or description is None')
+                    self.news_time_update_text.setText("сервис новостей сейчас отдыхает")
+                    self.news_time_update_text.setText("error update")
+                else:
+                    self.news_widget.setText('<b>' + news_block['title'] + '</b><br>' + news_block['description'])
 
-                time = QDateTime.currentDateTime()
-                date_time_display = time.toString('hh:mm:ss')
-                self.news_time_update_text.setText(BLOCK_TIME_UPDATE % date_time_display)
+                    time = QDateTime.currentDateTime()
+                    date_time_display = time.toString('hh:mm:ss')
+                    self.news_time_update_text.setText(BLOCK_TIME_UPDATE % date_time_display)
             else:
                 self.news_widget.setText('при загрузке новостей произошла ошибка')
 
