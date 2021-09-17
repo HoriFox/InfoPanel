@@ -20,8 +20,10 @@ from PyQt5 import QtCore, QtGui
 from PyQt5.QtGui import QPixmap, QFont, QMovie, QImage, QPainter, QPainterPath
 from PyQt5.QtCore import QTimer, QTime, Qt, QUrl, QDateTime, QThread, pyqtSignal, pyqtSlot
 from newsapi import NewsApiClient
+from transliterate import translit
 #from PyQt5.QtMultimedia import QMediaContent, QMediaPlayer
 #from PyQt5.QtMultimediaWidgets import QVideoWidget
+from mysqlhelper import DBConnection
 from lib.access import WEATHER_API_KEY, NEWS_API_KEY
 
 BLOCK_TIME_UPDATE = 'последнее обновление в %s'
@@ -87,7 +89,8 @@ class CameraThread(QThread):
                 for ((top, right, bottom, left), name) in zip(boxes, names):
                     cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 225), 2)
                     y = top - 15 if top - 15 > 15 else top + 15
-                    cv2.putText(frame, name, (left, y), cv2.FONT_HERSHEY_SIMPLEX, .8, (0, 255, 255), 2)
+                    name_translit = translit(name, "ru", reversed=True)
+                    cv2.putText(frame, name_translit, (left, y), cv2.FONT_HERSHEY_SIMPLEX, .8, (0, 255, 255), 2)
 
                 rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 h, w, ch = rgbImage.shape
@@ -118,11 +121,8 @@ class MainWindow(QWidget):
     def __init__(self, screen):
             super().__init__()
             self.setWindowIcon(QtGui.QIcon('icon.ico'))
-
             self.media_res = []
-        
             self.pir_sensor = MotionSensor(MOTION_SENSOR_PIN)
-            
             self.newsapi = NewsApiClient(api_key=NEWS_API_KEY)
 
             print('[DEBUG] Get status power tv')
@@ -132,7 +132,6 @@ class MainWindow(QWidget):
             if self.power_tv:
                     self.timeout_on_tv = self.delay_on_tv
             print('[INFO] Current power status tv:', 'on' if self.power_tv else 'off')
-
             if self.snn_work:
                 print('[DEBUG] Init camera/cv2/thread [> 2 sec]')
                 data = pickle.load(open(encodingsP, "rb"), encoding="latin1")
@@ -140,7 +139,6 @@ class MainWindow(QWidget):
                 vs = VideoStream(usePiCamera=True).start()
                 time.sleep(2.0)
                 self.camera_th = CameraThread(self, not self.power_tv, data, detector, vs)
-
             self.calculation_size(screen)
             self.init_timers()
             self.init_background()
@@ -312,6 +310,7 @@ class MainWindow(QWidget):
         self.what_buy_widget.setStyleSheet(
             "background-color: rgba(225, 233, 253, 120);border-radius:%sPX;font-size:%sPX;color:#eaf0ff;padding:%sPX;" 
             % self.fix([4, 12, 10]))
+        self.what_buy_widget.setWordWrap(True)
         shadow = QGraphicsDropShadowEffect()
         shadow.setBlurRadius(15)
         self.what_buy_widget.setGraphicsEffect(shadow)
@@ -498,7 +497,12 @@ class MainWindow(QWidget):
             Method update news label
             """
             self.log('[INFO] News updated')
-            top_headlines = self.newsapi.get_top_headlines(language='ru')
+            try:
+                top_headlines = self.newsapi.get_top_headlines(language='ru')
+            except Exception as ex:
+                self.log('[WARNING] Error update news:', ex)
+                return
+		
             if top_headlines['status'] == 'ok':
                 total = min(len(top_headlines['articles']), max_index)
                 print('[DEBUG] Total news:', total)
@@ -528,7 +532,25 @@ class MainWindow(QWidget):
             Method update todo label
             """
             self.log('[INFO] Todo updated by person')
-            self.what_buy_widget.setText("Что купить? (для %s)\n> Сыр\n> Молоко\n> Хлеб" % self.target_person)
+
+            output_string = '%s, Вы ещё не создавали заметки...' % self.target_person
+
+            link_bd = DBConnection(user="dacrover_user",
+                                   password="dacrover_pass",
+                                   host="itsuki.e",
+                                   port=3306,
+                                   database= "dacrover")
+
+            reminder_target = link_bd.select('reminders', where="`ReminderUser` = '" + self.target_person + "'", json=True)
+            if (len(reminder_target) > 0):
+                reminder_target = reminder_target[0]
+
+                discReminder = reminder_target['ReminderDisc']
+                listReminder = reminder_target['ReminderList'].split('[DEL]')
+
+                output_string = '%s, напоминание для Вас:\n%s\n' % (self.target_person, discReminder) + '-'*30 + '\n\n' + '\n'.join(listReminder)
+
+            self.what_buy_widget.setText(output_string)
 
 
     def fix(self, size, side='w'):
