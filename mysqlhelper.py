@@ -2,7 +2,12 @@ import pymysql
 
 class DBConnection:
     def __init__(self, **kwargs):
-        self.connect = pymysql.connect(**kwargs)
+        try:
+            self.connect = pymysql.connect(**kwargs)
+        except pymysql.err.OperationalError as err:
+            print('OperationalError:', err)
+        except pymysql.Error as err:
+            print('Error:', err)
 
     def __del__(self):
         self.connect.close()
@@ -23,7 +28,7 @@ class DBConnection:
                 query += " ON DUPLICATE KEY UPDATE %s" % (placeholders_update)
             cursor.execute(query, list(kwargs.values()))
         except pymysql.Error as err:
-            print('Error', err)
+            print('Error:', err)
         else:
             self.connect.commit()
 
@@ -42,7 +47,7 @@ class DBConnection:
             if json:
                 result = [dict((cursor.description[i][0], value) for i, value in enumerate(row)) for row in result]
         except pymysql.Error as err:
-            print('Error', err)
+            print('Error:', err)
 
         return result
 
@@ -52,6 +57,6 @@ class DBConnection:
             query = "DELETE FROM %s WHERE %s" % (table, where)
             cursor.execute(query)
         except pymysql.Error as err:
-            print('Error', err)
+            print('Error:', err)
         else:
             self.connect.commit()
