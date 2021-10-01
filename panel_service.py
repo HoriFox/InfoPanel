@@ -1,31 +1,23 @@
 #!/bin/python3
 
-import os, os.path
 import sys
 import platform
 import requests
 import json
 import logging
-from imutils.video import VideoStream
-import face_recognition
-import imutils
-import pickle
-import cv2
-import time
 import random
 from subprocess import call, Popen, PIPE
-from picamera import PiCamera
 from gpiozero import MotionSensor
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, 
 QHBoxLayout, QGridLayout, QPushButton, QGraphicsOpacityEffect, QGraphicsDropShadowEffect)
 from PyQt5 import QtCore, QtGui
 from PyQt5.QtGui import QPixmap, QFont, QMovie, QImage, QPainter, QPainterPath
-from PyQt5.QtCore import QTimer, QTime, Qt, QUrl, QDateTime, QThread, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import QTimer, QTime, Qt, QUrl, QDateTime, pyqtSlot
 from newsapi import NewsApiClient
-from transliterate import translit
 #from PyQt5.QtMultimedia import QMediaContent, QMediaPlayer
 #from PyQt5.QtMultimediaWidgets import QVideoWidget
 from mysqlhelper import DBConnection
+from snn_service import CameraThread
 from lib.access import WEATHER_API_KEY, NEWS_API_KEY
 
 LOGLEVEL = logging.DEBUG
@@ -50,75 +42,6 @@ RELEASE_PROD='5.10.17-v7l+'
 #CITY_NAME='Moscow,RU'
 CITY_ID=524901 #'Moscow,RU'
 MOTION_SENSOR_PIN = 21
-
-
-class CameraThread(QThread):
-    current_name = "Unknown"
-    pause = False
-    changePixmap = pyqtSignal(QImage)
-
-    def __init__(self, mv, pause, data, detector, vs):
-        super().__init__()
-        self.mv = mv
-        self.pause = pause
-        self.data = data
-        self.detector = detector
-        self.vs = vs 
-
-    def set_pause(self):
-        self.pause = True
-        
-    def set_resume(self):
-        self.pause = False
-
-    def run(self):
-        while True:
-            if not self.pause:
-                frame = self.vs.read()
-                frame = imutils.resize(frame, width=500)
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                rects = self.detector.detectMultiScale(gray, scaleFactor=1.1, 
-                    minNeighbors=5, minSize=(30, 30),
-                    flags=cv2.CASCADE_SCALE_IMAGE)
-                boxes = [(y, x + w, y + h, x) for (x, y, w, h) in rects]
-                encodings = face_recognition.face_encodings(rgb, boxes)
-                names = []
-                for encoding in encodings:
-                    matches = face_recognition.compare_faces(self.data["encodings"],
-                        encoding)
-                    name = "Unknown"
-
-                    if True in matches:
-                        matchedIdxs = [i for (i, b) in enumerate(matches) if b]
-                        counts = {}
-                        for i in matchedIdxs:
-                            name = self.data["names"][i]
-                            counts[name] = counts.get(name, 0) + 1
-                        name = max(counts, key=counts.get)
-                        if self.current_name != name:
-                            self.current_name = name
-                            self.mv.change_person(self.current_name)
-                    names.append(name)
-
-                for ((top, right, bottom, left), name) in zip(boxes, names):
-                    cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 225), 2)
-                    y = top - 15 if top - 15 > 15 else top + 15
-                    name_translit = translit(name, "ru", reversed=True)
-                    cv2.putText(frame, name_translit, (left, y), cv2.FONT_HERSHEY_SIMPLEX, .8, (0, 255, 255), 2)
-
-                rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                h, w, ch = rgbImage.shape
-                bytesPerLine = ch * w
-                convertToQtFormat = QImage(rgbImage.data, w, h, bytesPerLine, QImage.Format_RGB888)
-                #convertToQtFormat.setStyleSheet("border-bottom-left-radius: 10px;")
-                # maybe this?
-                #image = qimage2ndarray.array2qimage(frame)
-                p = convertToQtFormat.scaled(450, 350, Qt.KeepAspectRatio)	
-                
-                self.changePixmap.emit(p)
-                
-            time.sleep(0.5)
 
 
 class MainWindow(QWidget):
@@ -149,11 +72,7 @@ class MainWindow(QWidget):
             log.info('Current power status tv: %s' % ('on' if self.power_tv else 'off'))
             if self.snn_work:
                 log.debug('Init camera/cv2/thread [> 2 sec]')
-                data = pickle.load(open(encodingsP, "rb"), encoding="latin1")
-                detector = cv2.CascadeClassifier(cascade)
-                vs = VideoStream(usePiCamera=True).start()
-                time.sleep(2.0)
-                self.camera_th = CameraThread(self, not self.power_tv, data, detector, vs)
+                self.camera_th = CameraThread(self, not self.power_tv, encodingsP, cascade)
             self.calculation_size(screen)
             self.init_timers()
             self.init_background()
@@ -531,7 +450,6 @@ class MainWindow(QWidget):
                 if news_block['title'] == None or news_block['description'] == None:
                     log.warning('Title or description is None')
                     self.news_time_update_text.setText("сервис новостей сейчас отдыхает")
-                    self.news_time_update_text.setText("error update")
                 else:
                     self.news_widget.setText('<b>' + news_block['title'] + '</b><br>' + news_block['description'])
 
