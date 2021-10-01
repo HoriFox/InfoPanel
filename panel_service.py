@@ -1,9 +1,11 @@
 #!/bin/python3
 
+import os, os.path
 import sys
 import platform
 import requests
 import json
+import logging
 from imutils.video import VideoStream
 import face_recognition
 import imutils
@@ -25,6 +27,19 @@ from transliterate import translit
 #from PyQt5.QtMultimediaWidgets import QVideoWidget
 from mysqlhelper import DBConnection
 from lib.access import WEATHER_API_KEY, NEWS_API_KEY
+
+LOGLEVEL = logging.DEBUG
+LOGFILE = 'logs/infopanel.log'
+
+logFormatter = logging.Formatter("[%(asctime)s] [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
+log = logging.getLogger()
+log.setLevel(LOGLEVEL)
+fileHandler = logging.FileHandler(LOGFILE)
+fileHandler.setFormatter(logFormatter)
+log.addHandler(fileHandler)
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+log.addHandler(consoleHandler)
 
 BLOCK_TIME_UPDATE = 'последнее обновление в %s'
 
@@ -109,7 +124,7 @@ class CameraThread(QThread):
 class MainWindow(QWidget):
     dev_screen_width = 388
     dev_screen_height = 690
-    delay_on_tv = 10
+    delay_on_tv = 20
     snn_work = True
     debug_news = False
 
@@ -125,15 +140,15 @@ class MainWindow(QWidget):
             self.pir_sensor = MotionSensor(MOTION_SENSOR_PIN)
             self.newsapi = NewsApiClient(api_key=NEWS_API_KEY)
 
-            print('[DEBUG] Get status power tv')
+            log.debug('Get status power tv')
             # Get current power status tv
             status_tv = Popen('echo pow 0 | cec-client -s -d 1 | grep "standby"', shell=True, stdout=PIPE)
             self.power_tv = True if len(status_tv.stdout.read()) == 0 else False
             if self.power_tv:
                     self.timeout_on_tv = self.delay_on_tv
-            print('[INFO] Current power status tv:', 'on' if self.power_tv else 'off')
+            log.info('Current power status tv: %s' % ('on' if self.power_tv else 'off'))
             if self.snn_work:
-                print('[DEBUG] Init camera/cv2/thread [> 2 sec]')
+                log.debug('Init camera/cv2/thread [> 2 sec]')
                 data = pickle.load(open(encodingsP, "rb"), encoding="latin1")
                 detector = cv2.CascadeClassifier(cascade)
                 vs = VideoStream(usePiCamera=True).start()
@@ -164,8 +179,8 @@ class MainWindow(QWidget):
             self.coef_height = self.screen_height / self.dev_screen_height
             self.setWindowFlag(Qt.FramelessWindowHint)
             #self.showMaximized()
-            print('[DEBUG] Window coefficients - c_width:', round(self.coef_width, 3), ', c_height:', round(self.coef_height, 3))
-            print('[DEBUG] Window size - width:', self.screen_width, ', height:', self.screen_height)
+            log.debug('Window coefficients - c_width: %s, c_height: %s' % (round(self.coef_width, 3), round(self.coef_height, 3)))
+            log.debug('Window size - width: %s, height: %s' % (self.screen_width, self.screen_height))
             self.resize(self.screen_width, self.screen_height)
 		
 		
@@ -369,9 +384,9 @@ class MainWindow(QWidget):
         self.setLayout(vertical_l)
 
 
-    def log(self, *message):
+    def multi_log(self, *message):
             print_mes = ' '.join(map(str, message))
-            print(print_mes)
+            log.debug(print_mes)
             self.debug_widget.setText(print_mes)
 
 
@@ -380,17 +395,17 @@ class MainWindow(QWidget):
             Method of constant fixed update every 1 second
             """
             sensor_value = self.pir_sensor.motion_detected
-            #self.log('[DEBUG] Sensor:', sensor_value)
+            #self.multi_log('[DEBUG] Sensor:', sensor_value)
             if self.power_tv:
                     if not sensor_value:
                             if self.timeout_on_tv != 0:
                                     self.timeout_on_tv -= 1
-                                    self.log('[DEBUG]', self.timeout_on_tv)
+                                    self.multi_log('[DEBUG]', self.timeout_on_tv)
                             else:
                                     self.hibernation()
                                     self.power_tv = False
                     else:
-                            self.log('[DEBUG] Motion found. Set delay')
+                            self.multi_log('[DEBUG] Motion found. Set delay')
                             self.timeout_on_tv = self.delay_on_tv
             else:
                     if sensor_value:
@@ -410,7 +425,7 @@ class MainWindow(QWidget):
             """
             Method switch the panel to hibernation
             """
-            self.log('[INFO] Turn off panel')
+            self.multi_log('Turn off panel')
             call("echo standby 0 | cec-client -s -d 1 > /dev/null", shell=True)
             self.time_hibernation = 0
             
@@ -425,7 +440,7 @@ class MainWindow(QWidget):
             """
             Method switch the panel to awake
             """
-            self.log('[INFO] Turn on panel')
+            self.multi_log('Turn on panel')
             call("echo on 0 | cec-client -s -d 1 > /dev/null", shell=True)
             
             # 5 min update weather
@@ -464,7 +479,7 @@ class MainWindow(QWidget):
             """
             Method update weather label
             """
-            self.log('[INFO] Weather updated')
+            self.multi_log('Weather updated')
             try:
                     if self.debug_news:
                         with open('stat.txt', encoding='utf-8', errors='ignore') as stat:
@@ -488,7 +503,7 @@ class MainWindow(QWidget):
                     date_time_display = time.toString('hh:mm:ss')
                     self.weather_time_update_text.setText(BLOCK_TIME_UPDATE % date_time_display)
             except Exception as e:
-                    self.log("[ERROR] Exception (find):", e)
+                    self.multi_log("[ERROR] Exception (find):", e)
 
 
     def update_news(self):
@@ -496,25 +511,25 @@ class MainWindow(QWidget):
             """
             Method update news label
             """
-            self.log('[INFO] News updated')
+            self.multi_log('News updated')
             try:
                 top_headlines = self.newsapi.get_top_headlines(language='ru')
             except Exception as ex:
-                self.log('[WARNING] Error update news:', ex)
+                self.multi_log('[WARNING] Error update news:', ex)
                 return
 		
             if top_headlines['status'] == 'ok':
                 total = min(len(top_headlines['articles']), max_index)
-                print('[DEBUG] Total news:', total)
+                log.debug('Total news: %s' % total)
                 index_new = random.randint(0, total - 1)
-                print('[DEBUG] Current news:', index_new)
+                log.debug('Current news: %s' % index_new)
                 news_block = top_headlines['articles'][index_new]
                 #date_time_public = news_block['publishedAt'].replace('Z', '').split('T')
                 #title_show_block = news_block['source']['name'] + ' - ' + date_time_public[0] + ' в ' 
                 #+ date_time_public[1] + '\n'
                 # news_show_message = title_show_block + news_block['title'] + '\n' + news_block['description']
                 if news_block['title'] == None or news_block['description'] == None:
-                    print('[WARNING] Title or description is None')
+                    log.warning('Title or description is None')
                     self.news_time_update_text.setText("сервис новостей сейчас отдыхает")
                     self.news_time_update_text.setText("error update")
                 else:
@@ -531,11 +546,12 @@ class MainWindow(QWidget):
             """
             Method update todo label
             """
-            self.log('[INFO] Todo updated by person')
+            self.multi_log('Todo updated by person')
 
             output_string = '%s, Вы ещё не создавали заметки...' % self.target_person
 
-            link_bd = DBConnection(user="dacrover_user",
+            link_bd = DBConnection(log, 
+                                   user="dacrover_user",
                                    password="dacrover_pass",
                                    host="itsuki.e",
                                    port=3306,

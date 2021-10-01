@@ -1,18 +1,27 @@
 import pymysql
 
 class DBConnection:
-    def __init__(self, **kwargs):
+    log = None
+    connect = None
+
+    def __init__(self, log, **kwargs):
+        self.log = log
         try:
             self.connect = pymysql.connect(**kwargs)
         except pymysql.err.OperationalError as err:
-            print('OperationalError:', err)
+            self.log.error('OperationalError local except: %s' % err)
         except pymysql.Error as err:
-            print('Error:', err)
+            self.log.error('Error local except: %s' % err)
 
     def __del__(self):
-        self.connect.close()
+        if self.connect:
+            self.connect.close()
 
     def insert(self, table, is_replace = False, timestamp = None, **kwargs):
+        if self.connect == None:
+            self.log.warning('Connect not exist!')
+            return
+
         query = ''
         
         try:
@@ -28,13 +37,17 @@ class DBConnection:
                 query += " ON DUPLICATE KEY UPDATE %s" % (placeholders_update)
             cursor.execute(query, list(kwargs.values()))
         except pymysql.Error as err:
-            print('Error:', err)
+            self.log.error('Error local except: %s' % err)
         else:
             self.connect.commit()
 
         return query
 
     def select(self, table, where = None, json = False):
+        if self.connect == None:
+            self.log.warning('Connect not exist!')
+            return
+
         result = ''
 
         try:
@@ -47,16 +60,20 @@ class DBConnection:
             if json:
                 result = [dict((cursor.description[i][0], value) for i, value in enumerate(row)) for row in result]
         except pymysql.Error as err:
-            print('Error:', err)
+            self.log.error('Error local except: %s' % err)
 
         return result
 
     def delete(self, table, where):
+        if self.connect == None:
+            self.log.warning('Connect not exist!')
+            return
+
         try:
             cursor = self.connect.cursor()
             query = "DELETE FROM %s WHERE %s" % (table, where)
             cursor.execute(query)
         except pymysql.Error as err:
-            print('Error:', err)
+            self.log.error('Error local except: %s' % err)
         else:
             self.connect.commit()
