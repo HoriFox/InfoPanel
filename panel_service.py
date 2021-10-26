@@ -6,6 +6,7 @@ import requests
 import json
 import logging
 import random
+import pathlib
 from subprocess import call, Popen, PIPE
 from gpiozero import MotionSensor
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, 
@@ -21,7 +22,7 @@ from snn_service import CameraThread
 from lib.access import WEATHER_API_KEY, NEWS_API_KEY
 
 LOGLEVEL = logging.DEBUG
-LOGFILE = 'logs/infopanel.log'
+LOGFILE = '/var/log/infopanel.log'
 
 logFormatter = logging.Formatter("[%(asctime)s] [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
 log = logging.getLogger()
@@ -35,8 +36,10 @@ log.addHandler(consoleHandler)
 
 BLOCK_TIME_UPDATE = 'последнее обновление в %s'
 
-encodingsP = "lib/snn/encodings.pickle"
-cascade = "lib/snn/haarcascade_frontalface_default.xml"
+WORK_DIR = pathlib.Path(__file__).parent.resolve()
+
+encodingsP = "%s/lib/snn/encodings.pickle" % WORK_DIR
+cascade = "%s/lib/snn/haarcascade_frontalface_default.xml"  % WORK_DIR
 
 RELEASE_PROD='5.10.17-v7l+'
 #CITY_NAME='Moscow,RU'
@@ -58,7 +61,7 @@ class MainWindow(QWidget):
 
     def __init__(self, screen):
             super().__init__()
-            self.setWindowIcon(QtGui.QIcon('icon.ico'))
+            self.setWindowIcon(QtGui.QIcon('%s/icon.ico' % WORK_DIR))
             self.media_res = []
             self.pir_sensor = MotionSensor(MOTION_SENSOR_PIN)
             self.newsapi = NewsApiClient(api_key=NEWS_API_KEY)
@@ -120,7 +123,7 @@ class MainWindow(QWidget):
         
     def init_background(self):
         label = QLabel(self)
-        pixmap = QPixmap('res/img/back_v3.png')
+        pixmap = QPixmap('%s/res/img/back_v3.png' % WORK_DIR)
         pixmap = pixmap.scaled(self.screen_width, self.screen_height, QtCore.Qt.KeepAspectRatio)
         label.setPixmap(pixmap)
         label.resize(self.screen_width, self.screen_height)
@@ -409,7 +412,7 @@ class MainWindow(QWidget):
                             params={'id': CITY_ID, 'units': 'metric', 'lang': 'ru', 'APPID': WEATHER_API_KEY})
                         data = res.json()
 
-                    pixmap = QPixmap('res/img/weather_pack/%s.png' % data['weather'][0]['icon'])
+                    pixmap = QPixmap('%s/res/img/weather_pack/%s.png' % (WORK_DIR, data['weather'][0]['icon']))
                     pixmap = pixmap.scaled(self.fix(50), self.fix(50), QtCore.Qt.KeepAspectRatio)
                     self.weather_img.setPixmap(pixmap)
 

@@ -6,7 +6,8 @@ newsapi-python
 unclutter
 cmake
 build-essential
-pkg-config git
+pkg-config 
+git
 libjpeg-dev
 libtiff-dev
 libjasper-dev

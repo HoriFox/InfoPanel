@@ -1,0 +1,7 @@
+#locate to /etc/xdg/autostart/infopanel.desktop
+
+[Desktop Entry]
+Name=InfoPanel GUI service
+Exec=sh -c "/usr/bin/python3 /usr/local/bin/infopanel/panel_service.py"
+Type=Application
+X-GNOME-Autostart-enabled=true
