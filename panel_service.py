@@ -410,20 +410,21 @@ class MainWindow(QWidget):
                     else:
                         res = requests.get("http://api.openweathermap.org/data/2.5/weather",
                             params={'id': CITY_ID, 'units': 'metric', 'lang': 'ru', 'APPID': WEATHER_API_KEY})
-                        data = res.json()
+                        if res != None:
+                            data = res.json()
+                    if data != None:
+                        pixmap = QPixmap('%s/res/img/weather_pack/%s.png' % (WORK_DIR, data['weather'][0]['icon']))
+                        pixmap = pixmap.scaled(self.fix(50), self.fix(50), QtCore.Qt.KeepAspectRatio)
+                        self.weather_img.setPixmap(pixmap)
 
-                    pixmap = QPixmap('%s/res/img/weather_pack/%s.png' % (WORK_DIR, data['weather'][0]['icon']))
-                    pixmap = pixmap.scaled(self.fix(50), self.fix(50), QtCore.Qt.KeepAspectRatio)
-                    self.weather_img.setPixmap(pixmap)
-
-                    self.weather_text.setText('%s\n%s...%s...%s' % (data['weather'][0]['description'], 
-                                                round(data['main']['temp_min']), 
-                                                round(data['main']['temp']), 
-                                                round(data['main']['temp_max'])))
-            
-                    time = QDateTime.currentDateTime()
-                    date_time_display = time.toString('hh:mm:ss')
-                    self.weather_time_update_text.setText(BLOCK_TIME_UPDATE % date_time_display)
+                        self.weather_text.setText('%s\n%s...%s...%s' % (data['weather'][0]['description'], 
+                                                    round(data['main']['temp_min']), 
+                                                    round(data['main']['temp']), 
+                                                    round(data['main']['temp_max'])))
+                
+                        time = QDateTime.currentDateTime()
+                        date_time_display = time.toString('hh:mm:ss')
+                        self.weather_time_update_text.setText(BLOCK_TIME_UPDATE % date_time_display)
             except Exception as e:
                     self.multi_log("[ERROR] Exception (find):", e)
 
@@ -479,7 +480,7 @@ class MainWindow(QWidget):
                                    database= "dacrover")
 
             reminder_target = link_bd.select('reminders', where="`ReminderUser` = '" + self.target_person + "'", json=True)
-            if (len(reminder_target) > 0):
+            if (reminder_target != None and len(reminder_target) > 0):
                 reminder_target = reminder_target[0]
 
                 discReminder = reminder_target['ReminderDisc']
