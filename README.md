@@ -2,6 +2,8 @@
 
 ## InfoPanel - Инфо-панель (время, погода и т.д.)
 
+![Визуал](https://github.com/HoriFox/InfoPanel/blob/master/img/InfoPanelVisual.png)
+
 #### Файл ключей  
 ```bash
 # В директории `panel` создать файл `access.py`
