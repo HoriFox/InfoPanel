@@ -26,5 +26,13 @@ DEV запуск на АРМ (START):
 Script path: `[LOCAL]/InfoPanel/panel/start_gui_win.sh`  
 Working directory и Interpreter path соответствующие  
 
+#### Переферия  
+* AHT20+BMP280 - компиляция датчиков  
+  * AHT20 - датчик температуры и влажности  
+  * BMP280 - датчик атмосферного давления и температуры  
+* KY040 - энкодер с кнопкой  
+* ADS1115 - АЦП для считывания аналогово сигнала  
+* SR602 - датчик движения  
+
 #### Схема подключения переферии
 ![Схема](https://github.com/HoriFox/InfoPanel/blob/master/img/InfoPanel.png)
