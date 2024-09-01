@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+
+from bmp_280 import BMP280
+from time import sleep
+
+CONVERT_HPA_MMHG = 0.7506
+OFFSET_TEMPERTURE = -0.6
+
+bmp = BMP280(port=1,
+	     addr=0x77,
+	     mode=BMP280.NORMAL_MODE,
+	     oversampling_p=BMP280.OVERSAMPLING_P_x16,
+             oversampling_t=BMP280.OVERSAMPLING_T_x4,
+             filter=BMP280.IIR_FILTER_x2,
+	     standby=BMP280.T_STANDBY_1000)
+
+while True:
+	pressure_hpa = bmp.read_pressure()
+	pressure_mmhg = pressure_hpa * CONVERT_HPA_MMHG
+	temp = bmp.read_temperature() + OFFSET_TEMPERTURE
+
+	#print("Pressure (hPa): %s, Temp (C): %s" % (str(round(pressure)), str(round(temp))))
+	print("Pressure (hPa): %s - (mmHg): %s, Temp (C): %s" % (str(pressure_hpa), str(pressure_mmhg), str(temp)))
+	sleep(1)
+#print("Temperature (°C): " + str(temp))
+
+# INFO BMP280
+#https://3d-diy.ru/wiki/arduino-datchiki/sensor-bmp280/

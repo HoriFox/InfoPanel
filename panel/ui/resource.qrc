@@ -1,0 +1,6 @@
+<RCC>
+  <qresource>
+    <file>../src/resource/icons/add.png</file>
+    <file>../src/resource/back2.png</file>
+  </qresource>
+</RCC>
