@@ -1,6 +1,6 @@
 <img src="https://github.com/HoriFox/SmartHomeCentralDoc/blob/main/gitimg/infopanel_logo.png" width="500">
 
-## InfoPanel - Инфо-панель умного дома (время, погода, новости, персональные напоминания)
+## InfoPanel - Инфо-панель (время, погода и т.д.)
 
-## Схема
-![Схема](https://github.com/HoriFox/SmartHomeCentralDoc/blob/main/gitimg/system.png)
+# Схема подключения
+![Схема](https://github.com/HoriFox/InfoPanel/blob/master/img/InfoPanel.png)
