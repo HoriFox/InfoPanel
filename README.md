@@ -2,7 +2,7 @@
 
 ## InfoPanel - Инфо-панель (время, погода и т.д.)
 
-![Визуал](https://github.com/HoriFox/InfoPanel/blob/master/img/InfoPanelVisual.png)
+<img src="https://github.com/HoriFox/InfoPanel/blob/master/img/InfoPanelVisual.png" width="500">
 
 #### Файл ключей  
 ```bash
