@@ -2,7 +2,19 @@
 
 ## InfoPanel - Инфо-панель (время, погода и т.д.)
 
-# Настройки запуска в PyCharm (Win)  
+#### Файл ключей  
+```bash
+# В директории `panel` создать файл `access.py`
+WEATHER_API_KEY_ACCESS = "[КЛЮЧ]"
+```
+
+#### Запуск на конечном АРМ (Linux)  
+Из директории файла: `start_gui_linux.sh`
+
+#### Запуск на конечном АРМ (Win)  
+Из директории файла: `start_gui_win.sh`
+
+#### Настройки запуска в PyCharm (Win)  
 Запуск удалённо (REMOTE_START):  
 Script path: `[LOCAL]/InfoPanel/panel/start_gui_remote.sh`  
 Working directory: `[LOCAL]/InfoPanel/panel`  
@@ -12,5 +24,5 @@ DEV запуск на АРМ (START):
 Script path: `[LOCAL]/InfoPanel/panel/start_gui_win.sh`  
 Working directory и Interpreter path соответствующие  
 
-# Схема подключения
+#### Схема подключения переферии
 ![Схема](https://github.com/HoriFox/InfoPanel/blob/master/img/InfoPanel.png)
