@@ -28,9 +28,9 @@ Working directory и Interpreter path соответствующие
 
 #### Добавление поддержки i2c и uart  
 Тут можно посмотреть список всех поддержек переопределений:  
-https://github.com/orangepi-xunlong/linux-orangepi/tree/orange-pi-5.10-rk3588/arch/arm64/boot/dts/rockchip/overlay
+https://github.com/orangepi-xunlong/linux-orangepi/tree/orange-pi-5.10-rk3588/arch/arm64/boot/dts/rockchip/overlay  
 Загрузить можно с помощью wget:  
-https://github.com/orangepi-xunlong/linux-orangepi/raw/orange-pi-5.10-rk3588/arch/arm64/boot/dts/rockchip/overlay/[НАЗВАНИЕ_ФАЙЛА]
+https://github.com/orangepi-xunlong/linux-orangepi/raw/orange-pi-5.10-rk3588/arch/arm64/boot/dts/rockchip/overlay/[НАЗВАНИЕ_ФАЙЛА]  
 Требуются файлы поддержки i2c и первого uart (можно скачать хоть все):  
 rk3588-i2c5-m3.dts  
 rk3588-i2c1-m4.dts  
