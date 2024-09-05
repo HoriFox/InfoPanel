@@ -26,6 +26,22 @@ DEV запуск на АРМ (START):
 Script path: `[LOCAL]/InfoPanel/panel/start_gui_win.sh`  
 Working directory и Interpreter path соответствующие  
 
+#### Добавление поддержки i2c и uart  
+Тут можно посмотреть список всех поддержек переопределений:  
+https://github.com/orangepi-xunlong/linux-orangepi/tree/orange-pi-5.10-rk3588/arch/arm64/boot/dts/rockchip/overlay
+Загрузить можно с помощью wget:  
+https://github.com/orangepi-xunlong/linux-orangepi/raw/orange-pi-5.10-rk3588/arch/arm64/boot/dts/rockchip/overlay/[НАЗВАНИЕ_ФАЙЛА]
+Требуются файлы поддержки i2c и первого uart (можно скачать хоть все):  
+rk3588-i2c5-m3.dts  
+rk3588-i2c1-m4.dts  
+rk3588-uart1-m1.dts  
+Установка пользовательских overlay-ев (пример):  
+```bash
+armbian-add-overlay rk3588-uart1-m1.dts  
+```
+После установки необходимо перезагрузить orangepi5  
+После перезагрузки должен появиться `/dev/ttyS1` и два новых i2c в `/dev/i2c-*`
+
 #### Переферия  
 * AHT20+BMP280 - компиляция датчиков  
   * AHT20 - датчик температуры и влажности  

@@ -70,8 +70,10 @@ if (Serial.available() > 0) {
       loading();
     } else if (incomingMessage == "heil") {
       heil();
+    } else if (incomingMessage == "data") {
+      Serial.print("null\n");
     }
-    
+
     clear();
   }
 }
