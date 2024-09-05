@@ -14,6 +14,9 @@ void setup() {
   strip.setBrightness(LED_BRIGHTNESS);
   strip.begin();
   strip.show();
+
+  //loading();
+  //clear();
 }
 
 int getRignIndex(int index) {
@@ -66,13 +69,16 @@ if (Serial.available() > 0) {
     String incomingMessage = Serial.readString();
     Serial.print(incomingMessage);
 
+    incomingMessage.replace("\r\n", "");
+
     if (incomingMessage == "loading") {
       loading();
     } else if (incomingMessage == "heil") {
       heil();
-    } else if (incomingMessage == "data") {
-      Serial.print("null\n");
-    }
+    } 
+//    else if (incomingMessage == "data") {
+//      Serial.write("null");
+//    }
 
     clear();
   }

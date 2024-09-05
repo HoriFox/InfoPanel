@@ -9,6 +9,7 @@ import requests
 import logging
 import pathlib
 import threading
+import serial
 # from PyQt5.QtMultimedia import QSound
 
 if RELEASE_PROD:
@@ -72,6 +73,12 @@ BMP280_ADDRESS = 0x77
 AHT20_ADDRESS = 0x38
 ADS1115_ADDRESS = 0x48
 
+# Путь к uarl порту общения с arduino
+UART_URL = "/dev/ttyS1"
+HEIL_COMMAND = b"heil\r\n"
+LOADING_COMMAND = b"loading\r\n"
+DATA_COMMAND = b"data\r\n"
+
 
 class App(QWidget):
     dev_screen_width = 388
@@ -90,6 +97,7 @@ class App(QWidget):
     bmp_sensor = None
     aht20_sensor = None
     ky040_thread = None
+    serial = None
     timer_fixed_update = None
     timer_minute_fixed_update = None
     timer_weather = None
@@ -107,6 +115,9 @@ class App(QWidget):
 
         if not RELEASE_PROD:
             self.multi_log('ПО панели в режиме разработки!')
+
+        self.serial = serial.Serial(UART_URL, 9600, timeout=1)
+        self.send_command(command=LOADING_COMMAND)
 
         if RELEASE_PROD:
             wiringpi.wiringPiSetup()
@@ -193,6 +204,9 @@ class App(QWidget):
         """
         self.multi_log("Pressed")
 
+    def send_command(self, command=HEIL_COMMAND):
+        self.serial.write(command)
+
     def calculation_size(self, size):
         """
         Метод авто масштабирования окна и рассчёта коэффициента масштабирования
@@ -254,7 +268,7 @@ class App(QWidget):
 
         self.timer_weather = QTimer()
         self.timer_weather.setInterval(30 * 60 * 1000)  # 30 min
-        self.timer_weather.timeout.connect(self.update_weather)
+        self.timer_weather.timeout.connect(self.half_hour_fixed_update)
         self.timer_weather.start()
 
     def multi_log(self, *message):
@@ -270,6 +284,8 @@ class App(QWidget):
         """
         Метод фиксированного обновления каждую 1 секунду
         """
+        #self.send_command(command=LOADING_COMMAND)
+
         # wiringpi.digitalWrite(15, HIGH)
         # sleep(0.280)
         # val_0 = self.ads_board.readADC(0)
@@ -312,9 +328,17 @@ class App(QWidget):
         """
         Метод фиксированного обновления каждую 1 минуту
         """
+        self.send_command(command=LOADING_COMMAND)
         self.weather_update_timestamp += 1
         self.ui.weather_time_update_text.setText(WEATHER_TIME_UPDATE % self.weather_update_timestamp)
         self.update_met_sensor()
+
+    def half_hour_fixed_update(self):
+        """
+        Метод фиксированного обновления каждые 30 минут
+        """
+        self.send_command(command=LOADING_COMMAND)
+        self.update_weather()
 
     def update_met_sensor(self):
         """
