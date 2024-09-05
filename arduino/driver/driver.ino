@@ -5,6 +5,7 @@
 #define LED_COUNT 12
 #define LED_BRIGHTNESS 10     // Set to 0 for darkest and 255 for brightest
 
+bool loading_work = true;
 int position = 0;
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
@@ -65,20 +66,26 @@ void clear() {
 }
 
 void loop() {
-if (Serial.available() > 0) {
+  if (loading_work == true) {
+    loading();
+    clear();
+  }
+
+  if (Serial.available() > 0) {
     String incomingMessage = Serial.readString();
     Serial.print(incomingMessage);
 
     incomingMessage.replace("\r\n", "");
 
-    if (incomingMessage == "loading") {
+    if (incomingMessage == "loading_end") {
+      loading_work = false;
+    } else if (incomingMessage == "loading") {
       loading();
     } else if (incomingMessage == "heil") {
       heil();
-    } 
-//    else if (incomingMessage == "data") {
-//      Serial.write("null");
-//    }
+    } else if (incomingMessage == "data") {
+      Serial.write("null");
+    }
 
     clear();
   }

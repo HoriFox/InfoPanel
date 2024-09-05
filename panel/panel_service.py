@@ -77,6 +77,7 @@ ADS1115_ADDRESS = 0x48
 UART_URL = "/dev/ttyS1"
 HEIL_COMMAND = b"heil\r\n"
 LOADING_COMMAND = b"loading\r\n"
+LOADING_END_COMMAND = b"loading_end\r\n"
 DATA_COMMAND = b"data\r\n"
 
 
@@ -117,7 +118,7 @@ class App(QWidget):
             self.multi_log('ПО панели в режиме разработки!')
 
         self.serial = serial.Serial(UART_URL, 9600, timeout=1)
-        self.send_command(command=LOADING_COMMAND)
+        self.send_command(command=LOADING_END_COMMAND)
 
         if RELEASE_PROD:
             wiringpi.wiringPiSetup()
