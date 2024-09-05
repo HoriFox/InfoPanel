@@ -10,6 +10,7 @@ int position = 0;
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 void setup() {
+  Serial.begin(9600);
   strip.setBrightness(LED_BRIGHTNESS);
   strip.begin();
   strip.show();
@@ -55,7 +56,22 @@ void heil() {
   }
 }
 
+void clear() {
+  strip.clear();
+  strip.show();
+}
+
 void loop() {
-  heil();
-  loading();
+if (Serial.available() > 0) {
+    String incomingMessage = Serial.readString();
+    Serial.print(incomingMessage);
+
+    if (incomingMessage == "loading") {
+      loading();
+    } else if (incomingMessage == "heil") {
+      heil();
+    }
+    
+    clear();
+  }
 }
