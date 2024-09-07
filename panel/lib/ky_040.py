@@ -26,8 +26,8 @@ class Encoder:
     latest_switch_press = None
 
     step = 1  # Scale step from min to max
-    max_counter = 100  # Scale max
-    min_counter = 0  # Scale min
+    # max_counter = 100  # Scale max
+    # min_counter = 0  # Scale min
     counter = 0  # Initial scale position
     counter_loop = False  # If True, when at MAX, loop to MIN (-> 0, ..., MAX, MIN, ..., ->)
 
@@ -74,15 +74,15 @@ class Encoder:
         else:
             self.counter_loop = False
 
-        if 'scale_min' in params:
-            assert isinstance(params['scale_min'], int) or isinstance(params['scale_min'], float)
-            self.min_counter = params['scale_min']
-            self.counter = self.min_counter
-            self.warnFloatDepreciation(params['scale_min'])
-        if 'scale_max' in params:
-            assert isinstance(params['scale_max'], int) or isinstance(params['scale_max'], float)
-            self.max_counter = params['scale_max']
-            self.warnFloatDepreciation(params['scale_max'])
+        # if 'scale_min' in params:
+        #     assert isinstance(params['scale_min'], int) or isinstance(params['scale_min'], float)
+        #     self.min_counter = params['scale_min']
+        #     self.counter = self.min_counter
+        #     self.warnFloatDepreciation(params['scale_min'])
+        # if 'scale_max' in params:
+        #     assert isinstance(params['scale_max'], int) or isinstance(params['scale_max'], float)
+        #     self.max_counter = params['scale_max']
+        #     self.warnFloatDepreciation(params['scale_max'])
         if 'step' in params:
             assert isinstance(params['step'], int) or isinstance(params['step'], float)
             self.step = params['step']
@@ -121,11 +121,12 @@ class Encoder:
 
     def _clockwise_tick(self):
 
-        if self.counter + self.step <= self.max_counter:
-            self.counter += self.step
-        elif self.counter + self.step > self.max_counter:
-            # If loop, go back to min once max is reached. Else, just set it to max.
-            self.counter = self.min_counter if self.counter_loop is True else self.max_counter
+        self.counter += self.step
+        # if self.counter + self.step <= self.max_counter:
+        #     self.counter += self.step
+        # elif self.counter + self.step > self.max_counter:
+        #     # If loop, go back to min once max is reached. Else, just set it to max.
+        #     self.counter = self.min_counter if self.counter_loop is True else self.max_counter
 
         if self.inc_callback is not None:
             self.inc_callback(self.counter)
@@ -134,11 +135,12 @@ class Encoder:
 
     def _counterclockwise_tick(self):
 
-        if self.counter - self.step >= self.min_counter:
-            self.counter -= self.step
-        elif self.counter - self.step < self.min_counter:
-            # If loop, go back to min once max is reached. Else, just set it to max.
-            self.counter = self.max_counter if self.counter_loop is True else self.min_counter
+        self.counter -= self.step
+        # if self.counter - self.step >= self.min_counter:
+        #     self.counter -= self.step
+        # elif self.counter - self.step < self.min_counter:
+        #     # If loop, go back to min once max is reached. Else, just set it to max.
+        #     self.counter = self.max_counter if self.counter_loop is True else self.min_counter
 
         if self.inc_callback is not None:
             self.dec_callback(self.counter)

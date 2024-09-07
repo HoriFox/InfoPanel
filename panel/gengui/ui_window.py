@@ -37,39 +37,6 @@ class Ui_Form(object):
         self.verticalLayout_5.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout_5.setSpacing(0)
         self.verticalLayout_5.setObjectName("verticalLayout_5")
-        self.date_time_hide = QtWidgets.QWidget(self.black_container)
-        self.date_time_hide.setEnabled(True)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.date_time_hide.sizePolicy().hasHeightForWidth())
-        self.date_time_hide.setSizePolicy(sizePolicy)
-        self.date_time_hide.setMaximumSize(QtCore.QSize(0, 0))
-        self.date_time_hide.setObjectName("date_time_hide")
-        self.verticalLayout_6 = QtWidgets.QVBoxLayout(self.date_time_hide)
-        self.verticalLayout_6.setObjectName("verticalLayout_6")
-        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout_6.addItem(spacerItem)
-        self.date_widget_hide = QtWidgets.QLabel(self.date_time_hide)
-        font = QtGui.QFont()
-        font.setPointSize(15)
-        self.date_widget_hide.setFont(font)
-        self.date_widget_hide.setStyleSheet("color: #eaf0ff;\n"
-"")
-        self.date_widget_hide.setAlignment(QtCore.Qt.AlignCenter)
-        self.date_widget_hide.setObjectName("date_widget_hide")
-        self.verticalLayout_6.addWidget(self.date_widget_hide)
-        self.time_widget_hide = QtWidgets.QLabel(self.date_time_hide)
-        font = QtGui.QFont()
-        font.setPointSize(35)
-        self.time_widget_hide.setFont(font)
-        self.time_widget_hide.setStyleSheet("color: #eaf0ff;")
-        self.time_widget_hide.setAlignment(QtCore.Qt.AlignCenter)
-        self.time_widget_hide.setObjectName("time_widget_hide")
-        self.verticalLayout_6.addWidget(self.time_widget_hide)
-        spacerItem1 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout_6.addItem(spacerItem1)
-        self.verticalLayout_5.addWidget(self.date_time_hide)
         self.container = QtWidgets.QWidget(self.black_container)
         self.container.setAutoFillBackground(False)
         self.container.setStyleSheet("#container {\n"
@@ -79,15 +46,8 @@ class Ui_Form(object):
         self.verticalLayout = QtWidgets.QVBoxLayout(self.container)
         self.verticalLayout.setSpacing(0)
         self.verticalLayout.setObjectName("verticalLayout")
-        spacerItem2 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout.addItem(spacerItem2)
-        self.widget_3 = QtWidgets.QWidget(self.container)
-        self.widget_3.setObjectName("widget_3")
-        self.horizontalLayout = QtWidgets.QHBoxLayout(self.widget_3)
-        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
-        self.horizontalLayout.setSpacing(0)
-        self.horizontalLayout.setObjectName("horizontalLayout")
-        self.verticalLayout.addWidget(self.widget_3)
+        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.verticalLayout.addItem(spacerItem)
         self.date_widget = QtWidgets.QLabel(self.container)
         font = QtGui.QFont()
         font.setPointSize(15)
@@ -105,12 +65,128 @@ class Ui_Form(object):
         self.time_widget.setAlignment(QtCore.Qt.AlignCenter)
         self.time_widget.setObjectName("time_widget")
         self.verticalLayout.addWidget(self.time_widget)
-        spacerItem3 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout.addItem(spacerItem3)
-        spacerItem4 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout.addItem(spacerItem4)
-        spacerItem5 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout.addItem(spacerItem5)
+        spacerItem1 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.verticalLayout.addItem(spacerItem1)
+        spacerItem2 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.verticalLayout.addItem(spacerItem2)
+        self.widget_6 = QtWidgets.QWidget(self.container)
+        self.widget_6.setMinimumSize(QtCore.QSize(0, 160))
+        self.widget_6.setMaximumSize(QtCore.QSize(16777215, 160))
+        self.widget_6.setObjectName("widget_6")
+        self.horizontalLayout_6 = QtWidgets.QHBoxLayout(self.widget_6)
+        self.horizontalLayout_6.setContentsMargins(0, 0, 0, 10)
+        self.horizontalLayout_6.setSpacing(12)
+        self.horizontalLayout_6.setObjectName("horizontalLayout_6")
+        self.options_panel = QtWidgets.QWidget(self.widget_6)
+        self.options_panel.setMinimumSize(QtCore.QSize(140, 0))
+        self.options_panel.setMaximumSize(QtCore.QSize(140, 16777215))
+        self.options_panel.setStyleSheet("QWidget {\n"
+"    border: 1px solid #30363d;\n"
+"    border-radius: 8px;\n"
+"    background-color: rgba(22, 27, 34, 128);\n"
+"}")
+        self.options_panel.setObjectName("options_panel")
+        self.verticalLayout_3 = QtWidgets.QVBoxLayout(self.options_panel)
+        self.verticalLayout_3.setContentsMargins(10, 10, 10, 10)
+        self.verticalLayout_3.setSpacing(5)
+        self.verticalLayout_3.setObjectName("verticalLayout_3")
+        self.label = QtWidgets.QLabel(self.options_panel)
+        self.label.setStyleSheet("QWidget {\n"
+"    background: transparent;\n"
+"    border: none;\n"
+"    color: #eaf0ff;\n"
+"}")
+        self.label.setAlignment(QtCore.Qt.AlignCenter)
+        self.label.setObjectName("label")
+        self.verticalLayout_3.addWidget(self.label)
+        self.restart_panel_button = QtWidgets.QPushButton(self.options_panel)
+        self.restart_panel_button.setStyleSheet("QPushButton {\n"
+"    padding: 5px;\n"
+"    color: #eaf0ff;\n"
+"}\n"
+"\n"
+"QPushButton[select=\"true\"] {\n"
+"    background: #767676;\n"
+"}")
+        self.restart_panel_button.setObjectName("restart_panel_button")
+        self.verticalLayout_3.addWidget(self.restart_panel_button)
+        self.poweroff_panel_button = QtWidgets.QPushButton(self.options_panel)
+        self.poweroff_panel_button.setStyleSheet("QPushButton {\n"
+"    padding: 5px;\n"
+"    color: #eaf0ff;\n"
+"}\n"
+"\n"
+"QPushButton[select=\"true\"] {\n"
+"    background: #767676;\n"
+"}")
+        self.poweroff_panel_button.setObjectName("poweroff_panel_button")
+        self.verticalLayout_3.addWidget(self.poweroff_panel_button)
+        self.restart_po_button = QtWidgets.QPushButton(self.options_panel)
+        self.restart_po_button.setStyleSheet("QPushButton {\n"
+"    padding: 5px;\n"
+"    color: #eaf0ff;\n"
+"}\n"
+"\n"
+"QPushButton[select=\"true\"] {\n"
+"    background: #767676;\n"
+"}")
+        self.restart_po_button.setObjectName("restart_po_button")
+        self.verticalLayout_3.addWidget(self.restart_po_button)
+        self.diagnostic_button = QtWidgets.QPushButton(self.options_panel)
+        self.diagnostic_button.setStyleSheet("QPushButton {\n"
+"    padding: 5px;\n"
+"    color: #eaf0ff;\n"
+"}\n"
+"\n"
+"QPushButton[select=\"true\"] {\n"
+"    background: #767676;\n"
+"}")
+        self.diagnostic_button.setObjectName("diagnostic_button")
+        self.verticalLayout_3.addWidget(self.diagnostic_button)
+        self.horizontalLayout_6.addWidget(self.options_panel)
+        self.diagnostic_container = QtWidgets.QStackedWidget(self.widget_6)
+        self.diagnostic_container.setObjectName("diagnostic_container")
+        self.page = QtWidgets.QWidget()
+        self.page.setStyleSheet("background-color: transparent;")
+        self.page.setObjectName("page")
+        self.diagnostic_container.addWidget(self.page)
+        self.page_2 = QtWidgets.QWidget()
+        self.page_2.setStyleSheet("background-color: transparent;")
+        self.page_2.setObjectName("page_2")
+        self.verticalLayout_6 = QtWidgets.QVBoxLayout(self.page_2)
+        self.verticalLayout_6.setContentsMargins(0, 0, 0, 0)
+        self.verticalLayout_6.setSpacing(0)
+        self.verticalLayout_6.setObjectName("verticalLayout_6")
+        self.diagnostic_panel = QtWidgets.QWidget(self.page_2)
+        self.diagnostic_panel.setStyleSheet("QWidget {\n"
+"    border: 1px solid #30363d;\n"
+"    border-radius: 8px;\n"
+"    background-color: rgba(22, 27, 34, 128);\n"
+"}")
+        self.diagnostic_panel.setObjectName("diagnostic_panel")
+        self.verticalLayout_11 = QtWidgets.QVBoxLayout(self.diagnostic_panel)
+        self.verticalLayout_11.setObjectName("verticalLayout_11")
+        self.label_2 = QtWidgets.QLabel(self.diagnostic_panel)
+        self.label_2.setStyleSheet("QWidget {\n"
+"    background: transparent;\n"
+"    border: none;\n"
+"    color: #eaf0ff;\n"
+"}")
+        self.label_2.setAlignment(QtCore.Qt.AlignCenter)
+        self.label_2.setObjectName("label_2")
+        self.verticalLayout_11.addWidget(self.label_2)
+        self.diagnostic_text = QtWidgets.QPlainTextEdit(self.diagnostic_panel)
+        self.diagnostic_text.setStyleSheet("QPlainTextEdit {\n"
+"    background: transparent;\n"
+"    border: none;\n"
+"    color: #eaf0ff;\n"
+"}")
+        self.diagnostic_text.setObjectName("diagnostic_text")
+        self.verticalLayout_11.addWidget(self.diagnostic_text)
+        self.verticalLayout_6.addWidget(self.diagnostic_panel)
+        self.diagnostic_container.addWidget(self.page_2)
+        self.horizontalLayout_6.addWidget(self.diagnostic_container)
+        self.verticalLayout.addWidget(self.widget_6)
         self.widget_2 = QtWidgets.QWidget(self.container)
         self.widget_2.setObjectName("widget_2")
         self.horizontalLayout_3 = QtWidgets.QHBoxLayout(self.widget_2)
@@ -133,7 +209,7 @@ class Ui_Form(object):
         font = QtGui.QFont()
         font.setPointSize(12)
         self.update_weather_label.setFont(font)
-        self.update_weather_label.setStyleSheet("color: #607594;")
+        self.update_weather_label.setStyleSheet("color: #eaf0ff;")
         self.update_weather_label.setAlignment(QtCore.Qt.AlignCenter)
         self.update_weather_label.setObjectName("update_weather_label")
         self.verticalLayout_8.addWidget(self.update_weather_label)
@@ -166,8 +242,8 @@ class Ui_Form(object):
         self.verticalLayout_4.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout_4.setSpacing(10)
         self.verticalLayout_4.setObjectName("verticalLayout_4")
-        spacerItem6 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout_4.addItem(spacerItem6)
+        spacerItem3 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.verticalLayout_4.addItem(spacerItem3)
         self.weather_text_1 = QtWidgets.QLabel(self.widget_4)
         self.weather_text_1.setStyleSheet("color: #eaf0ff;")
         self.weather_text_1.setAlignment(QtCore.Qt.AlignCenter)
@@ -180,8 +256,8 @@ class Ui_Form(object):
         self.horizontalLayout_5.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout_5.setSpacing(0)
         self.horizontalLayout_5.setObjectName("horizontalLayout_5")
-        spacerItem7 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.horizontalLayout_5.addItem(spacerItem7)
+        spacerItem4 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout_5.addItem(spacerItem4)
         self.weather_text_2 = QtWidgets.QLabel(self.widget_5)
         self.weather_text_2.setStyleSheet("color: #eaf0ff;")
         self.weather_text_2.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
@@ -201,15 +277,15 @@ class Ui_Form(object):
         self.weather_text_4.setStyleSheet("color: #eaf0ff;")
         self.weather_text_4.setObjectName("weather_text_4")
         self.horizontalLayout_5.addWidget(self.weather_text_4)
-        spacerItem8 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.horizontalLayout_5.addItem(spacerItem8)
+        spacerItem5 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout_5.addItem(spacerItem5)
         self.verticalLayout_4.addWidget(self.widget_5)
-        spacerItem9 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout_4.addItem(spacerItem9)
+        spacerItem6 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.verticalLayout_4.addItem(spacerItem6)
         self.horizontalLayout_4.addWidget(self.widget_4)
         self.verticalLayout_7.addWidget(self.widget)
         self.weather_time_update_text = QtWidgets.QLabel(self.show_weather)
-        self.weather_time_update_text.setStyleSheet("color: #607594;")
+        self.weather_time_update_text.setStyleSheet("color: #eaf0ff;")
         self.weather_time_update_text.setAlignment(QtCore.Qt.AlignCenter)
         self.weather_time_update_text.setObjectName("weather_time_update_text")
         self.verticalLayout_7.addWidget(self.weather_time_update_text)
@@ -233,7 +309,7 @@ class Ui_Form(object):
         font = QtGui.QFont()
         font.setPointSize(12)
         self.update_home_info_label.setFont(font)
-        self.update_home_info_label.setStyleSheet("color: #607594;")
+        self.update_home_info_label.setStyleSheet("color: #eaf0ff;")
         self.update_home_info_label.setAlignment(QtCore.Qt.AlignCenter)
         self.update_home_info_label.setObjectName("update_home_info_label")
         self.verticalLayout_9.addWidget(self.update_home_info_label)
@@ -356,12 +432,17 @@ class Ui_Form(object):
 "}")
         self.humidity_value.setObjectName("humidity_value")
         self.verticalLayout_10.addWidget(self.humidity_value)
-        spacerItem10 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout_10.addItem(spacerItem10)
+        spacerItem7 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.verticalLayout_10.addItem(spacerItem7)
         self.home_info_container.addWidget(self.show_home_info)
         self.horizontalLayout_3.addWidget(self.home_info_container)
         self.verticalLayout.addWidget(self.widget_2)
         self.debug_container = QtWidgets.QWidget(self.container)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.debug_container.sizePolicy().hasHeightForWidth())
+        self.debug_container.setSizePolicy(sizePolicy)
         self.debug_container.setStyleSheet("#debug_container {\n"
 "    border: 1px solid #30363d;\n"
 "    border-radius: 8px;\n"
@@ -381,17 +462,22 @@ class Ui_Form(object):
         self.verticalLayout_2.addWidget(self.black_container)
 
         self.retranslateUi(Form)
-        self.weather_container.setCurrentIndex(1)
+        self.diagnostic_container.setCurrentIndex(1)
+        self.weather_container.setCurrentIndex(0)
         self.home_info_container.setCurrentIndex(1)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def retranslateUi(self, Form):
         _translate = QtCore.QCoreApplication.translate
         Form.setWindowTitle(_translate("Form", "INFOPANEL"))
-        self.date_widget_hide.setText(_translate("Form", "DATE_HIDE"))
-        self.time_widget_hide.setText(_translate("Form", "TIME_HIDE"))
         self.date_widget.setText(_translate("Form", "DATE"))
         self.time_widget.setText(_translate("Form", "TIME"))
+        self.label.setText(_translate("Form", "Функции"))
+        self.restart_panel_button.setText(_translate("Form", "Перезапуск панели"))
+        self.poweroff_panel_button.setText(_translate("Form", "Выключение панели"))
+        self.restart_po_button.setText(_translate("Form", "Перезапуск ПО"))
+        self.diagnostic_button.setText(_translate("Form", "Диагностика"))
+        self.label_2.setText(_translate("Form", "Диагностика"))
         self.update_weather_label.setText(_translate("Form", "Погода\n"
 "обновляется"))
         self.weather_img.setText(_translate("Form", "WEATHER_IMG"))

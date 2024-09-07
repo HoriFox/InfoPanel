@@ -1,6 +1,8 @@
 #!/bin/python3
 
 import sys
+import os
+import time
 from access import WEATHER_API_KEY_ACCESS
 
 RELEASE_PROD = (False if sys.argv[1] == "DEV" else True) if len(sys.argv) > 1 else True
@@ -9,10 +11,11 @@ import requests
 import logging
 import pathlib
 import threading
-import serial
+
 # from PyQt5.QtMultimedia import QSound
 
 if RELEASE_PROD:
+    import serial
     import wiringpi
     from wiringpi import GPIO, HIGH, LOW
     from lib.aht20 import AHT20
@@ -20,9 +23,9 @@ if RELEASE_PROD:
     from lib.ky_040 import Encoder
     # from lib.ads_1x15 import ADS1115
 
-from PyQt5.QtWidgets import QApplication, QWidget, QGraphicsDropShadowEffect
+from PyQt5.QtWidgets import QApplication, QWidget, QGraphicsDropShadowEffect, QShortcut
 from PyQt5 import QtCore, QtGui
-from PyQt5.QtGui import QPixmap, QColor
+from PyQt5.QtGui import QPixmap, QColor, QKeySequence
 from PyQt5.QtCore import QTimer, Qt, QDateTime
 
 from gengui import ui_window
@@ -49,14 +52,14 @@ DEV_HEIGHT_SIZE = 690
 # Настройки работы погоды (можно настроить)
 WEATHER_URL = "http://api.openweathermap.org/data/2.5/weather"
 WEATHER_API_KEY = WEATHER_API_KEY_ACCESS
-WEATHER_UPDATE = True
+WEATHER_UPDATE = False
 CITY_ID = 524901  # 'Moscow,RU'
 WEATHER_TIME_UPDATE = 'обновлено %s мин назад'
 CONVERT_HPA_MMHG = 0.7506
 
 # Датчик движения SR602 (можно настроить)
 SENSOR_SR602_PIN = 13  # GPIO2_D4
-SLEEP_ACTION = True  # Работа с датчиком движения, уход в сон и пробуждение
+SLEEP_ACTION = False  # Работа с датчиком движения, уход в сон и пробуждение
 DELAY_OFF = 20  # Время ожидания без движения
 
 # Высоковольтное реле (можно настроить)
@@ -64,6 +67,7 @@ RELAY_PIN = 4  # GPIO4_A4
 BACKLIGHT_ACTION = True  # Работа с подсветкой, отключение/включения подстветки для исключения выгорания дисплея
 
 # Энкодер KY040 (можно настроить)
+STEP_SENSITIVITY = 4
 BUTTON_KY040_PIN = 11  # SPI4_TXD
 ROTATE_KY040_PIN = 12  # SPI4_RXD
 CLK_KY040_PIN = 14  # SPI4_CLK
@@ -79,6 +83,28 @@ HEIL_COMMAND = b"heil\r\n"
 LOADING_COMMAND = b"loading\r\n"
 LOADING_END_COMMAND = b"loading_end\r\n"
 DATA_COMMAND = b"data\r\n"
+
+RESTART_PANEL = "restart_panel"
+POWER_OFF_PANEL = "power_off_panel"
+RESTART_PO = "restart_po"
+DIAGNOSTIC_PO = "diagnostic_po"
+CLOSE_OPTIONS = "close_options"
+
+
+class LinkedDictItem:
+    def __init__(self, value, _previous=None, _next=None):
+        self.previous = _previous
+        self.next = _next
+        self.value = value
+
+    def getPreviousKey(self):
+        return self.previous
+
+    def getNextKey(self):
+        return self.next
+
+    def getValue(self):
+        return self.value
 
 
 class App(QWidget):
@@ -104,6 +130,12 @@ class App(QWidget):
     timer_weather = None
     screen_width = 0
     screen_height = 0
+    button_list = {}
+    current_button_select = None
+    encoder_semaphore = False
+    encoder_current_pos = 0
+    options_container_show = False
+
 
     def __init__(self, app_object: QApplication):
         super().__init__()
@@ -114,13 +146,35 @@ class App(QWidget):
         self.ui.setupUi(self)
         self.setWindowIcon(QtGui.QIcon('%s/icon.ico' % WORK_DIR))
 
+        # Запечём все переходы между кнопками, пусть и массивно
+        # TODO: Сделать как-то более аккуратно
+        self.button_list[self.ui.restart_panel_button] = LinkedDictItem(value=RESTART_PANEL,
+                                                                        _previous=self.ui.close_option_button,
+                                                                        _next=self.ui.poweroff_panel_button)
+        self.button_list[self.ui.poweroff_panel_button] = LinkedDictItem(value=POWER_OFF_PANEL,
+                                                                         _previous=self.ui.restart_panel_button,
+                                                                         _next=self.ui.restart_po_button)
+        self.button_list[self.ui.restart_po_button] = LinkedDictItem(value=RESTART_PO,
+                                                                     _previous=self.ui.poweroff_panel_button,
+                                                                     _next=self.ui.diagnostic_button)
+        self.button_list[self.ui.diagnostic_button] = LinkedDictItem(value=DIAGNOSTIC_PO,
+                                                                     _previous=self.ui.restart_po_button,
+                                                                     _next=self.ui.close_option_button)
+        self.button_list[self.ui.close_option_button] = LinkedDictItem(value=CLOSE_OPTIONS,
+                                                                       _previous=self.ui.diagnostic_button,
+                                                                       _next=self.ui.restart_panel_button)
+        self.current_button_select = self.ui.close_option_button
+        self.set_button_select(self.current_button_select, True)
+        self.ui.diagnostic_container.setCurrentIndex(0)
+        self.ui.options_container.show() if self.options_container_show else self.ui.options_container.hide()
+
         if not RELEASE_PROD:
             self.multi_log('ПО панели в режиме разработки!')
 
-        self.serial = serial.Serial(UART_URL, 9600, timeout=1)
-        self.send_command(command=LOADING_END_COMMAND)
-
         if RELEASE_PROD:
+            self.serial = serial.Serial(UART_URL, 9600, timeout=1)
+            self.send_command(command=LOADING_END_COMMAND)
+
             wiringpi.wiringPiSetup()
             wiringpi.pinMode(SENSOR_SR602_PIN, GPIO.INPUT)
             wiringpi.pinMode(RELAY_PIN, GPIO.OUTPUT)
@@ -147,22 +201,30 @@ class App(QWidget):
 
             encoder = Encoder(CLK=CLK_KY040_PIN, DT=ROTATE_KY040_PIN, SW=BUTTON_KY040_PIN, polling_interval=1,
                               inc_callback=self.encoder_inc, dec_callback=self.encoder_dec,
-                              chg_callback=self.encoder_chg, sw_callback=self.encoder_button,
-                              sw_debounce_time=100)
+                              sw_callback=self.encoder_button, sw_debounce_time=100)
 
             self.ky040_thread = threading.Thread(target=encoder.watch)
             self.ky040_thread.start()
+        else:
+            self.inc_shortcut = QShortcut(QKeySequence(Qt.CTRL + Qt.Key_PageDown), self)
+            self.inc_shortcut.activated.connect(self.encoder_inc)
+            self.dec_shortcut = QShortcut(QKeySequence(Qt.CTRL + Qt.Key_PageUp), self)
+            self.dec_shortcut.activated.connect(self.encoder_dec)
+            self.click_shortcut = QShortcut(QKeySequence(Qt.CTRL + Qt.Key_Space), self)
+            self.click_shortcut.activated.connect(self.encoder_button)
 
         self.calculation_size(size)
 
         # Добавляем красивость в виде тени на UI элементы
-        for element in [self.ui.weather_container, self.ui.debug_container]:
-            shadow = QGraphicsDropShadowEffect()
-            shadow.setBlurRadius(16)
-            shadow.setColor(QColor(0, 0, 0, 128))
-            shadow.setXOffset(8)
-            shadow.setYOffset(8)
-            element.setGraphicsEffect(shadow)
+        # for element in [self.ui.weather_container, self.ui.debug_container,
+        #                 self.ui.home_info_container, self.ui.diagnostic_panel,
+        #                 self.ui.options_panel]:
+        #     shadow = QGraphicsDropShadowEffect()
+        #     shadow.setBlurRadius(16)
+        #     shadow.setColor(QColor(0, 0, 0, 128))
+        #     shadow.setXOffset(8)
+        #     shadow.setYOffset(8)
+        #     element.setGraphicsEffect(shadow)
 
         self.ui.weather_container.setCurrentIndex(0)
         self.ui.home_info_container.setCurrentIndex(0)
@@ -178,35 +240,91 @@ class App(QWidget):
 
         self.show()
 
-    def encoder_inc(self, pos):
+    def exec_option(self, option):
+        if option == RESTART_PANEL:
+            self.multi_log('Run RESTART_PANEL')
+            if RELEASE_PROD:
+                os.system("reboot 0")
+        elif option == POWER_OFF_PANEL:
+            self.multi_log('Run POWER_OFF_PANEL')
+            if RELEASE_PROD:
+                os.system("shutdown 0")
+        elif option == RESTART_PO:
+            self.multi_log('Run RESTART_PO')
+            if RELEASE_PROD:
+                os.system("systemctl restart panel")
+        elif option == DIAGNOSTIC_PO:
+            self.multi_log('Run DIAGNOSTIC_PO')
+            self.ui.diagnostic_container.setCurrentIndex(1)
+            self.diagnostic()
+        elif option == CLOSE_OPTIONS:
+            self.show_options_container(is_show=False)
+
+    def diagnostic(self):
+        self.ui.diagnostic_text.setPlainText("TEST")
+
+    def set_button_select(self, ui_element, select=False):
+        ui_element.setProperty("select", select)
+        ui_element.style().polish(ui_element)
+
+    def show_options_container(self, is_show=True):
+        self.ui.options_container.show() if is_show else self.ui.options_container.hide()
+        self.options_container_show = is_show
+
+    def encoder_inc(self, pos=0):
         """
         Callback метод вращения энкодера KY-040 по часовой стрелке
         :param pos: 0-100 позиция высчитанного положения
         """
-        self.multi_log('Rotary incremented: %s' % pos)
+        self.show_options_container()
+        if self.encoder_semaphore or pos - self.encoder_current_pos < STEP_SENSITIVITY:
+            return
+        self.encoder_semaphore = True
+        self.encoder_current_pos = pos
+        self.ui.diagnostic_container.setCurrentIndex(0)
+        self.set_button_select(self.current_button_select, False)
+        self.current_button_select = self.button_list[self.current_button_select].getNextKey()
+        self.set_button_select(self.current_button_select, True)
+        self.multi_log(self.button_list[self.current_button_select].getValue())
+        time.sleep(0.2)
+        self.encoder_semaphore = False
 
-    def encoder_dec(self, pos):
+    def encoder_dec(self, pos=0):
         """
         Callback метод вращения энкодера KY-040 против часовой стрелке
         :param pos: 0-100 позиция высчитанного положения
         """
-        self.multi_log('Rotary decremented: %s' % pos)
-
-    def encoder_chg(self, pos):
-        """
-        Callback метод измения угловой позиции энкодера KY-040
-        :param pos: 0-100 позиция высчитанного вращения
-        """
-        self.multi_log('Rotary changed: %s' % pos)
+        self.show_options_container()
+        if self.encoder_semaphore or self.encoder_current_pos - pos < STEP_SENSITIVITY:
+            return
+        self.encoder_semaphore = True
+        self.encoder_current_pos = pos
+        self.ui.diagnostic_container.setCurrentIndex(0)
+        self.set_button_select(self.current_button_select, False)
+        self.current_button_select = self.button_list[self.current_button_select].getPreviousKey()
+        self.set_button_select(self.current_button_select, True)
+        self.multi_log(self.button_list[self.current_button_select].getValue())
+        time.sleep(0.2)
+        self.encoder_semaphore = False
 
     def encoder_button(self):
         """
         Callback метод нажатия на энкодер KY-040
         """
-        self.multi_log("Pressed")
+        if not self.options_container_show:
+            self.show_options_container()
+            return
+        if self.encoder_semaphore:
+            return
+        self.encoder_semaphore = True
+        option = self.button_list[self.current_button_select].getValue()
+        self.exec_option(option)
+        time.sleep(0.2)
+        self.encoder_semaphore = False
 
     def send_command(self, command=HEIL_COMMAND):
-        self.serial.write(command)
+        if RELEASE_PROD:
+            self.serial.write(command)
 
     def calculation_size(self, size):
         """
@@ -228,11 +346,7 @@ class App(QWidget):
                        % (self.screen_width, self.screen_height))
         self.resize(self.screen_width, self.screen_height)
         self.ui.date_widget.setStyleSheet(self.ui.date_widget.styleSheet() + "font-size: %spx;" % self.fix(20))
-        self.ui.date_widget_hide.setStyleSheet(
-            self.ui.date_widget_hide.styleSheet() + "font-size: %spx;" % self.fix(20))
         self.ui.time_widget.setStyleSheet(self.ui.time_widget.styleSheet() + "font-size: %spx;" % self.fix(55))
-        self.ui.time_widget_hide.setStyleSheet(
-            self.ui.time_widget_hide.styleSheet() + "font-size: %spx;" % self.fix(55))
         self.ui.weather_text_1.setStyleSheet(self.ui.weather_text_1.styleSheet() + "font-size: %spx;" % self.fix(10))
         self.ui.weather_text_2.setStyleSheet(self.ui.weather_text_2.styleSheet() + "font-size: %spx;" % self.fix(10))
         self.ui.weather_text_3.setStyleSheet(self.ui.weather_text_3.styleSheet() + "font-size: %spx;" % self.fix(16))
@@ -244,6 +358,12 @@ class App(QWidget):
 
         self.ui.home_info_container.setMinimumWidth(self.fix(130))
         self.ui.home_info_container.setMaximumWidth(self.fix(130))
+        self.ui.down_container.setMinimumHeight(self.fix(130))
+        self.ui.down_container.setMaximumHeight(self.fix(130))
+        self.ui.options_panel.setMinimumWidth(self.fix(100))
+        self.ui.options_panel.setMaximumWidth(self.fix(100))
+        self.ui.up_container.setMinimumHeight(self.fix(120))
+        self.ui.up_container.setMaximumHeight(self.fix(120))
         self.ui.home_info_label.setStyleSheet(self.ui.home_info_label.styleSheet() + "font-size: %spx;" % self.fix(16))
         self.ui.pressure_label.setStyleSheet(self.ui.pressure_label.styleSheet() + "font-size: %spx;" % self.fix(10))
         self.ui.pressure_value.setStyleSheet(self.ui.pressure_value.styleSheet() + "font-size: %spx;" % self.fix(10))
@@ -285,7 +405,7 @@ class App(QWidget):
         """
         Метод фиксированного обновления каждую 1 секунду
         """
-        #self.send_command(command=LOADING_COMMAND)
+        # self.send_command(command=LOADING_COMMAND)
 
         # wiringpi.digitalWrite(15, HIGH)
         # sleep(0.280)
@@ -395,9 +515,7 @@ class App(QWidget):
         date_time_display[1] += " %s" % (self.week_ru[date_time_display[2]]
                                          if self.week_ru.__contains__(date_time_display[2]) else date_time_display[2])
         self.ui.time_widget.setText(date_time_display[0])
-        self.ui.time_widget_hide.setText(date_time_display[0])
         self.ui.date_widget.setText(date_time_display[1])
-        self.ui.date_widget_hide.setText(date_time_display[1])
 
     def update_weather(self):
         """
