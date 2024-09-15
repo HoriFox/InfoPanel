@@ -35,6 +35,7 @@ https://github.com/orangepi-xunlong/linux-orangepi/raw/orange-pi-5.10-rk3588/arc
 rk3588-i2c5-m3.dts  
 rk3588-i2c1-m4.dts  
 rk3588-uart1-m1.dts  
+rk3588-wifi-ap6275p.dts  
 Установка пользовательских overlay-ев (пример):  
 ```bash
 armbian-add-overlay rk3588-uart1-m1.dts  
@@ -51,4 +52,4 @@ armbian-add-overlay rk3588-uart1-m1.dts
 * SR602 - датчик движения  
 
 #### Схема подключения переферии
-![Схема](https://github.com/HoriFox/InfoPanel/blob/master/img/InfoPanel2.png)
+![Схема](https://github.com/HoriFox/InfoPanel/blob/master/img/InfoPanel3.png)
