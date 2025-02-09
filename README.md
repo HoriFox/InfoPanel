@@ -52,4 +52,4 @@ armbian-add-overlay rk3588-uart1-m1.dts
 * SR602 - датчик движения  
 
 #### Схема подключения переферии
-![Схема](https://github.com/HoriFox/InfoPanel/blob/master/img/InfoPanel3.png)
+![Схема](https://github.com/HoriFox/InfoPanel/blob/master/img/InfoPanel4.png)
