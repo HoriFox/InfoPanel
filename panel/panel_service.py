@@ -45,6 +45,11 @@ log.addHandler(consoleHandler)
 
 WORK_DIR = pathlib.Path(__file__).parent.resolve()
 
+# Основные пользовательские настройки (можно настроить)
+WEATHER_UPDATE = True
+SLEEP_ACTION = True  # Работа с датчиком движения, уход в сон и пробуждение
+BACKLIGHT_ACTION = True  # Работа с подсветкой, отключение/включения подстветки для исключения выгорания дисплея
+
 # Настройки DEV размеров отображения (можно настроить)
 DEV_WIDTH_SIZE = 388
 DEV_HEIGHT_SIZE = 690
@@ -52,19 +57,16 @@ DEV_HEIGHT_SIZE = 690
 # Настройки работы погоды (можно настроить)
 WEATHER_URL = "http://api.openweathermap.org/data/2.5/weather"
 WEATHER_API_KEY = WEATHER_API_KEY_ACCESS
-WEATHER_UPDATE = False
 CITY_ID = 524901  # 'Moscow,RU'
 WEATHER_TIME_UPDATE = 'обновлено %s мин назад'
 CONVERT_HPA_MMHG = 0.7506
 
 # Датчик движения SR602 (можно настроить)
 SENSOR_SR602_PIN = 13  # GPIO2_D4
-SLEEP_ACTION = False  # Работа с датчиком движения, уход в сон и пробуждение
 DELAY_OFF = 20  # Время ожидания без движения
 
 # Высоковольтное реле (можно настроить)
 RELAY_PIN = 4  # GPIO4_A4
-BACKLIGHT_ACTION = True  # Работа с подсветкой, отключение/включения подстветки для исключения выгорания дисплея
 
 # Энкодер KY040 (можно настроить)
 STEP_SENSITIVITY = 4
@@ -405,31 +407,6 @@ class App(QWidget):
         """
         Метод фиксированного обновления каждую 1 секунду
         """
-        # self.send_command(command=LOADING_COMMAND)
-
-        # wiringpi.digitalWrite(15, HIGH)
-        # sleep(0.280)
-        # val_0 = self.ads_board.readADC(0)
-        # val_1 = self.ads_board.readADC(1)
-        # val_2 = self.ads_board.readADC(2)
-        # val_3 = self.ads_board.readADC(3)
-
-        # self.multi_log("Analog0: {0:d}\t{1:.3f} V".format(val_0, val_0 * self.convert_volt))
-        # self.multi_log("Analog1: {0:d}\t{1:.3f} V".format(val_1, val_1 * self.convert_volt))
-        # self.multi_log("Analog2: {0:d}\t{1:.3f} V".format(val_2, val_2 * self.convert_volt))
-        # self.multi_log("Analog3: {0:d}\t{1:.3f} V".format(val_3, val_3 * self.convert_volt))
-
-        # sleep(0.40)
-        # wiringpi.digitalWrite(15, LOW)
-        #
-        # self.multi_log("0.17 * val_0(%s) * self.convert_volt(%s) - 0.1" % (val_0, self.convert_volt))
-        # dust0 = 0.17 * val_0 * self.convert_volt - 0.1
-        # self.multi_log("Analog0: {0:d}\t{1:.3f} V".format(val_0, dust0))
-        #
-        # self.multi_log("0.17 * val_1(%s) * self.convert_volt(%s) - 0.1" % (val_3, self.convert_volt))
-        # dust3 = 0.17 * val_3 * self.convert_volt - 0.1
-        # self.multi_log("Analog1: {0:d}\t{1:.3f} V".format(val_3, dust3))
-
         if SLEEP_ACTION and RELEASE_PROD:
             if wiringpi.digitalRead(SENSOR_SR602_PIN):
                 self.multi_log('Замечено движение!')
