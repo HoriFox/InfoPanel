@@ -3,6 +3,9 @@
 import sys
 import os
 import time
+import json
+import random
+
 from access import WEATHER_API_KEY_ACCESS
 
 RELEASE_PROD = (False if sys.argv[1] == "DEV" else True) if len(sys.argv) > 1 else True
@@ -58,7 +61,7 @@ DEV_HEIGHT_SIZE = 690
 WEATHER_URL = "http://api.openweathermap.org/data/2.5/weather"
 WEATHER_API_KEY = WEATHER_API_KEY_ACCESS
 CITY_ID = 524901  # 'Moscow,RU'
-WEATHER_TIME_UPDATE = 'обновлено %s мин назад'
+WEATHER_TIME_UPDATE = 'обновлено %s мин. назад'
 CONVERT_HPA_MMHG = 0.7506
 
 # Датчик движения SR602 (можно настроить)
@@ -138,7 +141,6 @@ class App(QWidget):
     encoder_current_pos = 0
     options_container_show = False
 
-
     def __init__(self, app_object: QApplication):
         super().__init__()
         screen = app_object.primaryScreen()
@@ -174,7 +176,7 @@ class App(QWidget):
             self.multi_log('ПО панели в режиме разработки!')
 
         if RELEASE_PROD:
-            self.serial = serial.Serial(UART_URL, 9600, timeout=1)
+            self.serial = serial.Serial(UART_URL, 115200, timeout=5)
             self.send_command(command=LOADING_END_COMMAND)
 
             wiringpi.wiringPiSetup()
@@ -207,6 +209,8 @@ class App(QWidget):
 
             self.ky040_thread = threading.Thread(target=encoder.watch)
             self.ky040_thread.start()
+            # Оформить как-нибудь получше
+            threading.Thread(target=self.read_command).start()
         else:
             self.inc_shortcut = QShortcut(QKeySequence(Qt.CTRL + Qt.Key_PageDown), self)
             self.inc_shortcut.activated.connect(self.encoder_inc)
@@ -325,8 +329,26 @@ class App(QWidget):
         self.encoder_semaphore = False
 
     def send_command(self, command=HEIL_COMMAND):
-        if RELEASE_PROD:
-            self.serial.write(command)
+        if not RELEASE_PROD:
+            return
+        self.serial.write(command)
+
+    def read_command(self):
+        if not RELEASE_PROD:
+            return
+
+        while True:
+            self.serial.write(DATA_COMMAND)
+            read_data = self.serial.readline()
+            if read_data:
+                try:
+                    json_content = json.loads(read_data)
+                    if "dust" in json_content:
+                        self.ui.dust_value.setText("%s mg/m³" % json_content["dust"])
+                    else:
+                        self.multi_log("Значения dust в полученных данных не существует!")
+                except Exception as err:
+                    self.multi_log("%s | Ошибка: %s" % (read_data, err))
 
     def calculation_size(self, size):
         """
@@ -347,6 +369,9 @@ class App(QWidget):
         self.multi_log('Размер окна - width: %s, height: %s'
                        % (self.screen_width, self.screen_height))
         self.resize(self.screen_width, self.screen_height)
+
+        self.ui.debug_container.setMaximumWidth(self.screen_width)
+
         self.ui.date_widget.setStyleSheet(self.ui.date_widget.styleSheet() + "font-size: %spx;" % self.fix(20))
         self.ui.time_widget.setStyleSheet(self.ui.time_widget.styleSheet() + "font-size: %spx;" % self.fix(55))
         self.ui.weather_text_1.setStyleSheet(self.ui.weather_text_1.styleSheet() + "font-size: %spx;" % self.fix(10))
@@ -421,6 +446,8 @@ class App(QWidget):
                     self.hide_panel()
 
         self.update_date_time()
+        # Запускаем в отдельном потоке, ибо операция блокирующая
+        #threading.Thread(target=self.read_command).start()
 
     def minute_fixed_update(self):
         """
@@ -430,6 +457,7 @@ class App(QWidget):
         self.weather_update_timestamp += 1
         self.ui.weather_time_update_text.setText(WEATHER_TIME_UPDATE % self.weather_update_timestamp)
         self.update_met_sensor()
+        #self.read_command()
 
     def half_hour_fixed_update(self):
         """

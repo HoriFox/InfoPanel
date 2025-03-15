@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="sizePolicy">
-   <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
     <horstretch>0</horstretch>
     <verstretch>0</verstretch>
    </sizepolicy>
@@ -884,7 +884,7 @@ QPushButton[select=&quot;true&quot;] {
 }</string>
                   </property>
                   <property name="text">
-                   <string>PRESSURE</string>
+                   <string>Обновляется...</string>
                   </property>
                  </widget>
                 </item>
@@ -950,7 +950,7 @@ QPushButton[select=&quot;true&quot;] {
 }</string>
                   </property>
                   <property name="text">
-                   <string>TEMPERATURE</string>
+                   <string>Обновляется...</string>
                   </property>
                  </widget>
                 </item>
@@ -1016,7 +1016,73 @@ QPushButton[select=&quot;true&quot;] {
 }</string>
                   </property>
                   <property name="text">
-                   <string>HUMIDITY</string>
+                   <string>Обновляется...</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="dust_label">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                  <property name="minimumSize">
+                   <size>
+                    <width>0</width>
+                    <height>16</height>
+                   </size>
+                  </property>
+                  <property name="maximumSize">
+                   <size>
+                    <width>16777215</width>
+                    <height>16</height>
+                   </size>
+                  </property>
+                  <property name="font">
+                   <font>
+                    <weight>75</weight>
+                    <bold>true</bold>
+                   </font>
+                  </property>
+                  <property name="styleSheet">
+                   <string notr="true">QLabel {
+	color: #607594;
+}</string>
+                  </property>
+                  <property name="text">
+                   <string>Пыль</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="dust_value">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                  <property name="minimumSize">
+                   <size>
+                    <width>0</width>
+                    <height>16</height>
+                   </size>
+                  </property>
+                  <property name="maximumSize">
+                   <size>
+                    <width>16777215</width>
+                    <height>16</height>
+                   </size>
+                  </property>
+                  <property name="styleSheet">
+                   <string notr="true">QLabel {
+	color: #eaf0ff;
+}</string>
+                  </property>
+                  <property name="text">
+                   <string>Обновляется...</string>
                   </property>
                  </widget>
                 </item>
@@ -1058,6 +1124,12 @@ QPushButton[select=&quot;true&quot;] {
            <layout class="QHBoxLayout" name="horizontalLayout_2">
             <item>
              <widget class="QLabel" name="debug_widget">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
               <property name="styleSheet">
                <string notr="true">QLabel {
 	color: #eaf0ff;
