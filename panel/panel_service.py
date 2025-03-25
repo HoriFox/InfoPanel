@@ -31,6 +31,8 @@ from PyQt5 import QtCore, QtGui
 from PyQt5.QtGui import QPixmap, QColor, QKeySequence
 from PyQt5.QtCore import QTimer, Qt, QDateTime
 
+import pyqtgraph as pg
+
 from gengui import ui_window
 
 LOG_LEVEL = logging.DEBUG
@@ -244,7 +246,44 @@ class App(QWidget):
 
         # self.sound_startup.play()
 
+        self.init_graph()
+
         self.show()
+
+    def init_graph(self):
+        """Инициализация графика CO2"""
+        self.plot_widget = pg.PlotWidget()
+        self.plot_widget.setBackground(None)
+        self.plot_widget.setStyleSheet("QGraphicsView { background: transparent; }")
+        self.ui.plot_co2_panel.layout().addWidget(self.plot_widget)
+
+        self.plot_widget.setLabel("left", "CO2 (ppm)")
+        self.plot_widget.setLabel("bottom", "Время")
+        self.plot_widget.getAxis("left").setTextPen("w")
+        self.plot_widget.getAxis("bottom").setTextPen("w")
+        self.plot_widget.showGrid(x=True, y=True)
+
+        self.x_data = []
+        self.y_data = []
+        self.start_time = time.time()
+
+        self.curve = self.plot_widget.plot([], [], pen=pg.mkPen(color="w", width=2))
+
+    def update_graph(self, value):
+        """Добавление новых данных и обновление графика"""
+        current_time = time.time()
+        elapsed_time = (current_time - self.start_time) / 3600  # Перевод в часы
+
+        self.x_data.append(elapsed_time)
+        self.y_data.append(value)
+
+        # Ограничение на 24 часа
+        if len(self.x_data) > 24 * 60 * 60:
+            self.x_data.pop(0)
+            self.y_data.pop(0)
+
+        self.curve.setData(self.x_data, self.y_data)
+        self.plot_widget.setXRange(max(0, int(elapsed_time - 24)), elapsed_time)  # Сдвиг оси X
 
     def exec_option(self, option):
         if option == RESTART_PANEL:
@@ -347,6 +386,12 @@ class App(QWidget):
                         self.ui.dust_value.setText("%s mg/m³" % json_content["dust"])
                     else:
                         self.multi_log("Значения dust в полученных данных не существует!")
+                    if "co2" in json_content:
+                        co2_value = int(json_content["co2"])
+                        self.ui.co2_value.setText("%s ppm" % co2_value)
+                        self.update_graph(co2_value)
+                    else:
+                        self.multi_log("Значения co2 в полученных данных не существует!")
                 except Exception as err:
                     self.multi_log("%s | Ошибка: %s" % (read_data, err))
 

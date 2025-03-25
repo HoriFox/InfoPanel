@@ -1,10 +1,13 @@
 #include <Adafruit_NeoPixel.h>
+#include <SoftwareSerial.h>
 #include <iarduino_VCC.h>
+#include "MHZ19.h"  
 #include "hsv.h"
 
 #define LED_PIN 6
 #define LED_COUNT 12
 #define LED_BRIGHTNESS 10           // Set to 0 for darkest and 255 for brightest
+//#define MHZ19_PIN 5                 // PWM MHZ19
 
 #define MEASURE_GP2Y10_PIN 0        // Pin A0
 #define LED_GP2Y10_PIN 7            // Pin D7
@@ -12,9 +15,15 @@
 #define DELTA_TIME_GP2Y10 40
 #define SLEEP_TIME_GP2Y10 9680
 
+#define RX_PIN 10
+#define TX_PIN 11
+unsigned long getDataTimer = 0;
+
 #define FIX_POWER_VOLTAGE 5.103
 
 float dustDensity = 0;
+int co2Value = 0;
+int8_t mhz19_temp = 0;
 
 bool loading_work = true;
 int position = 0;
@@ -23,8 +32,17 @@ int requestCounter = 0;
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
+MHZ19 myMHZ19;
+SoftwareSerial mySerial(RX_PIN, TX_PIN);
+
 void setup() {
   Serial.begin(115200);
+
+  //pinMode(MHZ19_PIN, INPUT);
+  mySerial.begin(9600);
+  myMHZ19.begin(mySerial);
+  myMHZ19.autoCalibration();
+
   strip.setBrightness(LED_BRIGHTNESS);
   strip.begin();
   strip.show();
@@ -132,12 +150,19 @@ void loop() {
       heil();
     } else if (incomingMessage == "data") {
       requestCounter++;
-      Serial.println("{\"request_number\":" + String(requestCounter) + ",\"dust\":" + String(dustDensity) + "}");
+      Serial.println("{\"request_number\":" + String(requestCounter) + ",\"dust\":" + String(dustDensity) + ",\"co2\":" + String(co2Value) + ",\"mhz19_temp\":" + String(mhz19_temp) + "}");
       //Serial.write("{\"request_number\":2,\"dust\":409.78}");
     }
 
     clear();
   }
+
+  if (millis() - getDataTimer >= 1000) {
+    co2Value = myMHZ19.getCO2();                    
+    mhz19_temp = myMHZ19.getTemperature();                         
+    getDataTimer = millis();
+  }
+
 }
 
 ISR(TIMER1_COMPA_vect) {
