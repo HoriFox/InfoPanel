@@ -1,10 +1,9 @@
 #!/bin/python3
-
+import datetime
 import sys
 import os
 import time
 import json
-import random
 
 from access import WEATHER_API_KEY_ACCESS
 
@@ -15,8 +14,6 @@ import logging
 import pathlib
 import threading
 
-# from PyQt5.QtMultimedia import QSound
-
 if RELEASE_PROD:
     import serial
     import wiringpi
@@ -24,14 +21,15 @@ if RELEASE_PROD:
     from lib.aht20 import AHT20
     from lib.bmp_280 import BMP280
     from lib.ky_040 import Encoder
-    # from lib.ads_1x15 import ADS1115
 
-from PyQt5.QtWidgets import QApplication, QWidget, QGraphicsDropShadowEffect, QShortcut
+from PyQt5.QtWidgets import QApplication, QWidget, QShortcut
 from PyQt5 import QtCore, QtGui
-from PyQt5.QtGui import QPixmap, QColor, QKeySequence
+from PyQt5.QtGui import QPixmap, QKeySequence
 from PyQt5.QtCore import QTimer, Qt, QDateTime
 
 import pyqtgraph as pg
+import numpy as np
+from collections import deque
 
 from gengui import ui_window
 
@@ -122,7 +120,6 @@ class App(QWidget):
     week_ru = {"Monday": "Понедельник", "Tuesday": "Вторник",
                "Wednesday": "Среда", "Thursday": "Четверг",
                "Friday": "Пятница", "Saturday": "Суббота", "Sunday": "Воскресенье"}
-    # sound_startup = QSound("%s/src/resource/startup.wav" % WORK_DIR)
 
     # Технические переменные не требующие изменения
     timeout_on_tv = DELAY_OFF
@@ -237,6 +234,8 @@ class App(QWidget):
         self.ui.weather_container.setCurrentIndex(0)
         self.ui.home_info_container.setCurrentIndex(0)
 
+        self.init_graph()
+
         self.init_timers()
         # Принудительные предварительные обновления нужных панелей перед показом
         self.update_weather()
@@ -244,9 +243,7 @@ class App(QWidget):
         # self.update_news()
         self.fixed_update()
 
-        # self.sound_startup.play()
-
-        self.init_graph()
+        self.play_sound()
 
         self.show()
 
@@ -261,29 +258,75 @@ class App(QWidget):
         self.plot_widget.setLabel("bottom", "Время")
         self.plot_widget.getAxis("left").setTextPen("w")
         self.plot_widget.getAxis("bottom").setTextPen("w")
+        self.plot_widget.getAxis("bottom").setTickSpacing(major=3600)  # Ключевые метки каждый час
+        # self.plot_widget.getAxis("bottom").setLabel(text="Время", units="ч")
+
         self.plot_widget.showGrid(x=True, y=True)
 
         self.x_data = []
         self.y_data = []
+        self.filter_window = deque(maxlen=10)
         self.start_time = time.time()
 
         self.curve = self.plot_widget.plot([], [], pen=pg.mkPen(color="w", width=2))
 
+    def format_time(self, elapsed_time):
+        """Преобразование времени в формат ЧЧ:ММ"""
+        current_time = datetime.datetime.now()
+        formatted_time = (current_time - datetime.timedelta(hours=24) +
+                          datetime.timedelta(hours=elapsed_time)).strftime("%H:%M")
+        return formatted_time
+
+    def filter_value(self, new_value):
+        if len(self.filter_window) < self.filter_window.maxlen:
+            self.filter_window.append(new_value)
+            return new_value
+
+        if new_value < 100:
+            return np.median(self.filter_window)
+
+        self.filter_window.append(new_value)
+        return new_value
+
     def update_graph(self, value):
         """Добавление новых данных и обновление графика"""
+        filtered_value = self.filter_value(value)
+
         current_time = time.time()
         elapsed_time = (current_time - self.start_time) / 3600  # Перевод в часы
 
+        if not isinstance(elapsed_time, (int, float)) or elapsed_time is None:
+            print(f"Ошибка: elapsed_time имеет некорректное значение: {elapsed_time}")
+            elapsed_time = 0
+
         self.x_data.append(elapsed_time)
-        self.y_data.append(value)
+        self.y_data.append(filtered_value)
 
         # Ограничение на 24 часа
         if len(self.x_data) > 24 * 60 * 60:
             self.x_data.pop(0)
             self.y_data.pop(0)
 
+        bottom_axis = self.plot_widget.getAxis("bottom")
+        if bottom_axis:
+            min_x = max(0, elapsed_time - 24)  # Начало отсчёта (24 часа назад)
+            max_x = elapsed_time  # Текущее время
+            tick_positions = np.linspace(min_x, max_x, num=6)  # 6 меток на оси X
+
+            # Корректное отображение меток времени
+            tick_labels = [
+                time.strftime("%H:%M", time.localtime(self.start_time + t * 3600))
+                for t in tick_positions
+            ]
+            bottom_axis.setTicks([list(zip(tick_positions, tick_labels))])
+
         self.curve.setData(self.x_data, self.y_data)
-        self.plot_widget.setXRange(max(0, int(elapsed_time - 24)), elapsed_time)  # Сдвиг оси X
+        self.plot_widget.setXRange(min_x, max_x)
+
+    def play_sound(self):
+        def play():
+            os.system("aplay -D plughw:1,0 %s/src/resource/startup.wav" % WORK_DIR)
+        threading.Thread(target=play, daemon=True).start()
 
     def exec_option(self, option):
         if option == RESTART_PANEL:
@@ -489,10 +532,9 @@ class App(QWidget):
                 # self.multi_log('До засыпания: %s' % self.timeout_on_tv)
                 if self.timeout_on_tv == 0 and self.visible:
                     self.hide_panel()
-
         self.update_date_time()
         # Запускаем в отдельном потоке, ибо операция блокирующая
-        #threading.Thread(target=self.read_command).start()
+        # threading.Thread(target=self.read_command).start()
 
     def minute_fixed_update(self):
         """
@@ -502,7 +544,7 @@ class App(QWidget):
         self.weather_update_timestamp += 1
         self.ui.weather_time_update_text.setText(WEATHER_TIME_UPDATE % self.weather_update_timestamp)
         self.update_met_sensor()
-        #self.read_command()
+        # self.read_command()
 
     def half_hour_fixed_update(self):
         """
@@ -543,7 +585,7 @@ class App(QWidget):
         if BACKLIGHT_ACTION:
             # Убираем сигнал на обрывающее подсветку реле
             wiringpi.digitalWrite(RELAY_PIN, LOW)
-            # self.sound_startup.play()
+            self.play_sound()
 
     def hide_panel(self):
         """
